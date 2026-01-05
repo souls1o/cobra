@@ -134,11 +134,11 @@ def auth_callback():
         country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
         location = f"{country_flag} {city}, {country}"
         
-        existing_user = groups.find_one({ "group_id": group_id, "users.id": user_id })
+        existing_user = groups.find_one({ "group.id": group_id, "users.id": user_id })
         
         if existing_user:
             groups.update_one(
-                {"group_id": group_id, "users.id": user_id},
+                {"group.id": group_id, "users.id": user_id},
                 {"$set": {
                     "users.$.username": username,
                     "users.$.location": location,
@@ -148,7 +148,7 @@ def auth_callback():
             )
         else:
             groups.update_one(
-                {"group_id": group_id},
+                {"group.id": group_id},
                 {
                     "$push": {
                         "users": {

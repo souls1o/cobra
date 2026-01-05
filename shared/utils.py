@@ -4,9 +4,9 @@ from shared.config import config
 bot_logger = config["LOGGER"]["BOT"]
 server_logger = config["LOGGER"]["SERVER"]
 
-def parse(text: str) -> str:
+def parse(text) -> str:
     special_chars = r"[]()~`>#+-=|{}.!_"
-    return ''.join(['\\' + c if c in special_chars else c for c in text])
+    return ''.join(['\\' + c if c in special_chars else c for c in str(text)])
 
 def formatter(n: int) -> str:
     if n < 1000:

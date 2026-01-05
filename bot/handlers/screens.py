@@ -30,9 +30,9 @@ async def unsubscribed(update, context):
 async def setup(update, context):
     chat_id = update.effective_chat.id
 
-    if private_check(update): return
+    if await private_check(update): return
 
-    group = groups.find_one({"group_id": chat_id})
+    group = groups.find_one({"group.id": chat_id})
     if group:
         text = "⚠️ *This group is already setup for OAuth\\.*"
         return await context.bot.send_message(chat_id, text, parse_mode)
@@ -66,5 +66,5 @@ async def setup(update, context):
     }
     groups.insert_one(group_data)
 
-    text = f"✅ *Group successfully setup for OAuth\\.*\n\n╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {chat_id}\n┣  *Group Name:* {parse(chat_title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* {owner_fullname}\n\n💬 _Use the */help* command to get the list of available commands\\._"
+    text = f"✅ *Group successfully setup for OAuth\\.*\n\n╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {parse(chat_id)}\n┣  *Group Name:* {parse(chat_title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* {owner_fullname}\n\n💬 _Use the */help* command to get the list of available commands\\._"
     await context.bot.send_message(chat_id, text, parse_mode)

@@ -5,7 +5,7 @@ config = {
     "DOMAIN": "https://us01-x.com",
     "BOT_TOKEN": os.environ["BOT_TOKEN"],
 
-    "MONGO_DB": "cobra_db",
+    "MONGO_DB": "cobra",
     "MONGO_URI": os.environ["MONGO_URI"],
 
     "DEBANK_API_KEY": os.environ["DEBANK_API_KEY"],
