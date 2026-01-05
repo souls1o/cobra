@@ -17,11 +17,9 @@ def formatter(n: int) -> str:
         return f'{n / 1000000:.2f}M'
 
 def send_message(chat_id: int, message: str) -> None:
-    message = parse(message)
-    
     bot_token = config["BOT_TOKEN"]
     try:
-        requests.post(
+        resp = requests.post(
             f'https://api.telegram.org/bot{bot_token}/sendMessage',
             data={
                 'chat_id': chat_id,
@@ -30,6 +28,9 @@ def send_message(chat_id: int, message: str) -> None:
             },
             timeout=5
         )
+        data = resp.json()
+
+        return data["result"]["message_id"]
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
 

