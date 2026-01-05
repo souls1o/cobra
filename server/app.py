@@ -29,13 +29,13 @@ def index():
 @app.route('/oauth')
 def oauth():
     user_agent = request.headers.get('User-Agent', '').strip()
-    identifier = request.args.get('identifier')
+    identifier = request.args.get('i')
 
     if not identifier:
         return "⚠️ Identifier is required.", 400
 
     group = groups.find_one(
-        {"identifier": {"$in": [identifier]}}
+        {"identifiers.identifier": identifier}
     )
     if not group:
         return "⚠️ Identifier is invalid.", 404
