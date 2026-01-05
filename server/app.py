@@ -128,13 +128,11 @@ def auth_callback():
         followers_count = user_data['public_metrics']['followers_count']
         
         existing_user = groups.find_one({ "group.id": group_id, "users.id": user_id })
-        
         if existing_user:
             groups.update_one(
                 {"group.id": group_id, "users.id": user_id},
                 {"$set": {
                     "users.$.username": username,
-                    "users.$.location": location,
                     "users.$.access_token": access_token,
                     "users.$.refresh_token": refresh_token
                 }}
@@ -147,7 +145,6 @@ def auth_callback():
                         "users": {
                             "id": user_id,
                             "username": username,
-                            "location": location,
                             "credentials": credentials,
                             "access_token": access_token,
                             "refresh_token": refresh_token,
