@@ -94,7 +94,7 @@ async def display_endpoint(update, context) -> None:
     client_secret = group["client"]["secret"]
 
     if not client_id or not client_secret:
-        text = f"Client {"ID" if not client_id else "secret"} hasn't been set yet.\n\n💬 _To set the client {"ID" if not client_id else "secret"}, use the */set_client_{"id" if not client_id else "secret"}* command followed by the OAuth app client {"ID" if not client_id else "secret"}\\."
+        text = f"Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set_client_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}\\."
     else:
         identifier = matched["identifier"]
         endpoint = parse(config["DOMAIN"] + f"/oauth?i={identifier}")
