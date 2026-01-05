@@ -33,7 +33,7 @@ def send_message(chat_id: int, message: str) -> None:
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
 
-def private_check(update):
+async def private_check(update):
     if update.effective_chat.type == "private":
         text = "❌ *This command can only be used in groups\\.*"
         
