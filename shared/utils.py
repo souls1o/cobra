@@ -1,0 +1,34 @@
+import requests
+from shared.config import config
+
+bot_logger = config["LOGGER"]["BOT"]
+server_logger = config["LOGGER"]["SERVER"]
+
+def parse(text: str) -> str:
+    special_chars = r"[]()~`>#+-=|{}.!_"
+    return ''.join(['\\' + c if c in special_chars else c for c in text])
+
+def formatter(n: int) -> str:
+    if n < 1000:
+        return str(n)
+    elif 1000 <= n < 1000000:
+        return f'{n / 1000:.2f}K'
+    else:
+        return f'{n / 1000000:.2f}M'
+
+def send_message(chat_id: int, message: str) -> None:
+    message = parse(message)
+    
+    bot_token = config["BOT_TOKEN"]
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{bot_token}/sendMessage',
+            data={
+                'chat_id': chat_id,
+                'text': message,
+                'parse_mode': 'MarkdownV2'
+            },
+            timeout=5
+        )
+    except Exception as e:
+        server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
