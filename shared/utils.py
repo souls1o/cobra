@@ -34,10 +34,28 @@ def send_message(chat_id: int, message: str) -> None:
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
 
-async def private_check(update):
+async def permission_check(update, groups, admin_command=False):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+
     if update.effective_chat.type == "private":
         text = "❌ *This command can only be used in groups\\.*"
         
-        await context.bot.send_message(update.effective_chat.id, text, parse_mode="MarkdownV2")
+        await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
         return True
+
+    group = groups.find_one({ "group.id": chat_id })
+    if not group:
+        text = "⚠️ *Group is not setup for OAuth\\.*\n\n💬 _Use the */setup* command to setup your group for OAuth\\._"
+        
+        await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
+        return True
+
+    if admin_command == True:
+        whitelist = group["whitelist"]
+        if user_id not in whitelist and user_id != group["owner_id"]:
+            text = "❌ *You are not authorized to use admin commands in this group\\.*"
+            await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2") 
+            return True
+    
     return False
