@@ -32,3 +32,11 @@ def send_message(chat_id: int, message: str) -> None:
         )
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
+
+def private_check(update):
+    if update.effective_chat.type == "private":
+        text = "❌ *This command can only be used in groups\\.*"
+        
+        await context.bot.send_message(update.effective_chat.id, text, parse_mode="MarkdownV2")
+        return True
+    return False

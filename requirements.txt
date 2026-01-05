@@ -1,6 +1,7 @@
 flask
 requests
 gunicorn
+colorama
 validators
 pymongo[srv]
 python-dotenv

