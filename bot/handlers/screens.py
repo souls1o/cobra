@@ -89,7 +89,7 @@ async def display_endpoint(update, context) -> None:
 
     user_id = update.effective_user.id
 
-    group = groups.find_one({"group_id": chat_id})
+    group = groups.find_one({"group.id": chat_id})
     matched = next(i for i in group["identifiers"] if i["user_id"] == user_id)
 
     client_id = group["client"]["id"]
