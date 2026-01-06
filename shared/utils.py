@@ -5,7 +5,7 @@ bot_logger = config["LOGGER"]["BOT"]
 server_logger = config["LOGGER"]["SERVER"]
 
 clients = []
-c_list = config["CLIENTS"]
+c_list = config["CLIENTS"].split(",")
 
 for client in c_list:
     data = client.split(":")
@@ -137,7 +137,7 @@ async def handle_generic_error(context, chat_id: int, res: requests.Response, re
     await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
     
     
-async def handle_token_refresh_and_retry(context: CallbackContext, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
+async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
     group = groups.find_one({"group.id": chat_id})
     
     new_access_token = None
@@ -169,7 +169,7 @@ async def handle_token_refresh_and_retry(context: CallbackContext, chat_id: int,
         username = parse(user["username"])
 
         text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
-        return await context.bot.send_message(chat_id, text, parse_mode)
+        return await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
         
     groups.update_one(
         {"group.id": chat_id, "users.username": user["username"]},
