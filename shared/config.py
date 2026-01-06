@@ -1,5 +1,7 @@
 import os
 from shared.logger import Logger
+from dotenv import load_dotenv
+load_dotenv()
 
 config = {
     "DOMAIN": "https://us01-x.com",

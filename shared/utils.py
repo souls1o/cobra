@@ -1,4 +1,5 @@
 import requests
+from shared.utils import parse
 from shared.config import config
 
 bot_logger = config["LOGGER"]["BOT"]
@@ -34,7 +35,7 @@ def send_message(chat_id: int, message: str) -> None:
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
 
-async def permission_check(update, groups, admin_command=False):
+async def permission_check(update, context, groups, admin_command=False, setup_command=False):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
@@ -45,13 +46,13 @@ async def permission_check(update, groups, admin_command=False):
         return False
 
     group = groups.find_one({ "group.id": chat_id })
-    if not group:
+    if not group and not setup_command:
         text = "⚠️ *Group is not setup for OAuth\\.*\n\n💬 _Use the */setup* command to setup your group for OAuth\\._"
         
         await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
         return False
 
-    if admin_command == True:
+    if admin_command:
         whitelist = group["whitelist"]
         if user_id not in whitelist and user_id != group["owner_id"]:
             text = "❌ *You are not authorized to use admin commands in this group\\.*"
@@ -59,3 +60,137 @@ async def permission_check(update, groups, admin_command=False):
             return False
     
     return True
+
+def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_community=False, user_id=0) -> tuple:
+    url = 'https://api.x.com/2/tweets' if not is_retweet else f'https://api.x.com/2/users/{user_id}/retweets'
+    if not is_retweet:
+        group = groups.find_one({"group.id": chat_id})
+        
+        json = {'text': message}
+
+        if not group["replies"] and not is_reply:
+            json["reply_settings"] = "mentionedUsers"
+
+        if is_reply:
+            json["reply"]["in_reply_to_tweet_id"] = tweet_id
+
+        if is_community:
+            json["community_id"] = community_id
+    else:
+        json = {'tweet_id': tweet_id}
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    try:
+        res = requests.post(url=url, json=json, headers=headers)
+        return res, res.json()
+    except Exception as e:
+        bot_logger.error(f"Failed to send tweet: {e}")
+
+async def handle_successful_tweet(context: CallbackContext, chat_id: int, username: str, response: dict, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True) -> None:
+    tweet_id = response['data']['id'] if not is_retweet else 0
+    username = parse(username)
+    if not is_retweet:
+        text = f"✅ *{'Reply' if is_reply else 'Quote tweet' if is_quote else 'Tweet'} successfully posted by user _{username}_\\.*\n" \
+            f"🐦 *Tweet ID:* `{tweet_id}`\n" \
+            f"🔗 __*[View {'reply' if is_reply else 'tweet'}](https://x\\.com/{username}/status/{tweet_id})*__"
+        
+        if not is_reply:
+            group = groups.find_one({"group_id": chat_id})
+    
+            replies_msg = "enabled" if group["replies"] else "restricted to mentioned only"
+            replies_msg2 = "disable" if group["replies"] else "enable"
+            text += f"\n\n💬 _Replies for this tweet are {replies_msg}\\. To {replies_msg2} replies for tweets, use the command */set\\_replies*\\._"
+    else:
+        text = f"✅ *Tweet successfully retweeted by user _{username}_\\.*"
+            
+    await context.bot.send_message(chat_id, text, parse_mode)
+    
+    
+async def handle_generic_error(context: CallbackContext, chat_id: int, res: requests.Response, response: dict) -> None:
+    print(response)
+    if res.status_code == 403 and 'detail' in response:
+        parse_mode = "MarkdownV2"
+        if 'duplicate content' in response['detail']:
+            text = "❌ *Tweet failed to post\\.*\n" \
+                   "⚠️ *Reason:* Duplicate content detected\\. You cannot post the same tweet multiple times\\."
+        elif 'deleted' in response['detail'] or 'not visible' in response['detail']:
+            text = "❌ *Reply failed to post\\.*\n" \
+                   "⚠️ *Reason:* The tweet you attempted to reply to has been deleted or is not visible to you\\."
+        else:
+            parse_mode = "MarkDown"
+            text = f"❌ *Failed to post tweet.*\n" \
+                   f"⚠️ *Error code:* {res.status_code}\n" \
+                   f"🛑 *Details:* {response.get('detail', 'Unknown error')}"
+    else:
+        parse_mode = "MarkDown"
+        text = f"❌ *Failed to post tweet.*\n" \
+               f"⚠️ *Error code:* {res.status_code}\n" \
+               f"🛑 *Details:* {response.get('detail', 'Unknown error')}"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
+    
+    
+async def handle_token_refresh_and_retry(context: CallbackContext, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
+    group = groups.find_one({"group_id": chat_id})
+    
+    new_access_token = None
+    new_refresh_token = None
+    
+    credentials = user.get("credentials")
+    if credentials:
+        new_access_token, new_refresh_token = await refresh_oauth_tokens(refresh_token, credentials)
+
+    if not new_access_token:
+        for setting in group["twitter_settings"]:
+            TWITTER_CLIENT_ID = setting["client_id"]
+            TWITTER_CLIENT_SECRET = setting["client_secret"]
+            credentials = base64.b64encode(f"{TWITTER_CLIENT_ID}:{TWITTER_CLIENT_SECRET}".encode()).decode('utf-8')
+
+            new_access_token, new_refresh_token = await refresh_oauth_tokens(refresh_token, credentials)
+            
+            if new_access_token:
+                break
+
+    if not new_access_token:
+        groups.update_one(
+            {"group_id": chat_id, "authenticated_users.username": user["username"]},
+            {"$unset": {
+                "authenticated_users.$.access_token": ""
+            }}
+        )
+        
+        username = filter_text(user["username"])
+
+        text = f"❌ *User [{username}](https://x\\.com/{username}) revoked OAuth access and is no longer valid\\.*"
+        return await context.bot.send_message(chat_id, text, parse_mode)
+        
+    groups.update_one(
+        {"group_id": chat_id, "authenticated_users.username": user["username"]},
+        {"$set": {
+            "authenticated_users.$.access_token": new_access_token,
+            "authenticated_users.$.refresh_token": new_refresh_token or refresh_token
+        }}
+    )
+
+    res, r = tweet(chat_id, new_access_token, message=message, tweet_id=tweet_id, community_id=community_id, is_reply=is_reply, is_retweet=is_retweet, is_quote=is_quote, is_community=is_community, user_id=user_id)
+    if res.status_code == 201 or res.status_code == 200:
+        if display:
+            await handle_successful_tweet(context, chat_id, user["username"], r, is_reply=is_reply, is_retweet=is_retweet, is_quote=is_quote, is_community=is_community)
+    else:
+        await handle_generic_error(context, chat_id, res, r)
+    
+    
+async def refresh_oauth_tokens(refresh_token: str, credentials) -> tuple:
+    url = 'https://api.twitter.com/2/oauth2/token'
+    data = {
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token
+    }
+    headers = {'Authorization': f'Basic {credentials}', 'Content-Type': 'application/x-www-form-urlencoded'}
+
+    try:
+        res = requests.post(url=url, data=data, headers=headers)
+        r = res.json()
+        return r.get("access_token"), r.get("refresh_token")
+    except Exception as e:
+        print(e)
+        return None, None

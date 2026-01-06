@@ -127,7 +127,7 @@ def auth_callback():
         response = requests.get('https://api.twitter.com/2/users/me', headers=headers, params=params)
 
         user_data = response.json().get('data', {})
-        user_id = user_data['id']
+        user_id = int(user_data['id'])
         username = user_data['username']
         followers_count = user_data['public_metrics']['followers_count']
         
