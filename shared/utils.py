@@ -1,5 +1,4 @@
 import requests
-from shared.utils import parse
 from shared.config import config
 
 bot_logger = config["LOGGER"]["BOT"]
