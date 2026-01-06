@@ -12,6 +12,8 @@ config = {
 
     "DEBANK_API_KEY": os.environ["DEBANK_API_KEY"],
 
+    "CLIENTS": os.environ["CLIENTS"],
+
     "LOGGER": {
         "BOT": Logger("BOT"),
         "SERVER": Logger("SERVER")

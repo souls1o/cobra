@@ -2,7 +2,7 @@ from shared.db import get_db
 from shared.config import config
 from telegram.ext import Application
 from bot.handlers.events import query
-from bot.handlers.commands import start, help, setup, display_users, display_endpoint, set_client_id, set_client_secret, set_redirect, set_spoof
+from bot.handlers.commands import start, help, setup, post_tweet, display_users, display_endpoint, set_client_id, set_client_secret, set_redirect, set_spoof
 
 def main():
     app = Application.builder().token(config["BOT_TOKEN"]).build()
@@ -10,6 +10,7 @@ def main():
     app.add_handler(start.get_handler())
     app.add_handler(help.get_handler())
     app.add_handler(setup.get_handler())
+    app.add_handler(post_tweet.get_handler())
     app.add_handler(display_users.get_handler())
     app.add_handler(display_endpoint.get_handler())
     app.add_handler(set_client_id.get_handler())

@@ -9,7 +9,7 @@ from telegram.constants import ChatMemberStatus
 
 from shared.db import get_db
 from shared.config import config
-from shared.utils import parse, permission_check
+from shared.utils import parse, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error
 
 parse_mode = "MarkdownV2"
 
@@ -269,16 +269,17 @@ async def post_tweet(update, context) -> None:
 
     community_id = int(args[0]) if type(args[0]) == int else 0
     is_community = True if type(args[0]) == int else False
-        
-    group = groups.find_one({"group_id": chat_id})
 
-    user = next((u for u in group.get('users', []) if (u['username'].lower() == args[0].lower() if not is_community else u['username'].lower() == args[1].lower())), None)
+    username = args[0] if not is_community else args[1]
+        
+    group = groups.find_one({"group.id": chat_id})
+
+    user = next((u for u in group.get('users', []) if u['username'].lower() == username.lower()), None)
     if not user:
-        text = f"⚠️ *User _{formatted}_ has not authorized with OAuth\\.*"
+        text = f"⚠️ *User _{parse(username)}_ has not authorized with OAuth\\.*"
         return await context.bot.send_message(chat_id, text, parse_mode)
         
-    message = ' '.join(arg.strip()
-                          for arg in args[1:]).replace('\\n', '\n')
+    message = ' '.join(arg.strip()for arg in (args[1:] if not is_community else args[2:])).replace('\\n', '\n')
     access_token, refresh_token, username = user.get("access_token"), user.get("refresh_token"), user["username"]
     if access_token:
         res, r = tweet(chat_id=chat_id, token=access_token, message=message, is_community=is_community, community_id=community_id)
@@ -294,6 +295,5 @@ async def post_tweet(update, context) -> None:
 
         await handle_generic_error(context, chat_id, res, r)
     else:
-        username = filter_text(username)
-        text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
+        text = f"❌ *User _[{parse(username)}](https://x\\.com/{parse(username)})_ revoked OAuth access and is no longer valid\\.*"
         await context.bot.send_message(chat_id, text, parse_mode)
