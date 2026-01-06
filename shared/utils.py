@@ -1,4 +1,5 @@
 import requests
+from shared.db import get_db
 from shared.config import config
 
 bot_logger = config["LOGGER"]["BOT"]
@@ -6,6 +7,9 @@ server_logger = config["LOGGER"]["SERVER"]
 
 clients = []
 c_list = config["CLIENTS"].split(",")
+
+db = get_db()
+groups = db["groups"]
 
 for client in c_list:
     data = client.split(":")
