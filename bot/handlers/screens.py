@@ -130,7 +130,7 @@ async def set_redirect(update, context) -> None:
 async def set_spoof(update, context) -> None:
     chat_id = get_chat_id(update)
     
-    if not permission_check(update, groups, admin_command=True): return
+    if not await permission_check(update, groups, admin_command=True): return
     
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_spoof <url>')
@@ -158,7 +158,7 @@ async def set_spoof(update, context) -> None:
 async def display_users(update, context, page=1, message_id=None) -> None:
     chat_id = update.effective_chat.id
     
-    if not permission_check(update, groups): return
+    if not await permission_check(update, groups): return
         
     group = groups.find_one({"group.id": chat_id})
     users = group['users']
