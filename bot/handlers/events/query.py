@@ -1,7 +1,6 @@
+from bot.handlers import screens
 from telegram import CallbackQuery, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
-from bot.handlers import screens
-from db.collections.users import get_user, update_user
 
 async def query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query

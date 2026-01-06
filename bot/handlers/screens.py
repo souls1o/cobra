@@ -106,7 +106,7 @@ async def display_endpoint(update, context) -> None:
 
     await context.bot.send_message(chat_id, text, parse_mode)
 
-async def set_redirect(update: Update, context: CallbackContext) -> None:
+async def set_redirect(update, context) -> None:
     chat_id = update.effective_chat.id
     
     if not await permission_check(update, groups, admin_command=True): return
@@ -127,7 +127,7 @@ async def set_redirect(update: Update, context: CallbackContext) -> None:
         
     await context.bot.send_message(chat_id, text, parse_mode)
         
-async def set_spoof(update: Update, context: CallbackContext) -> None:
+async def set_spoof(update, context) -> None:
     chat_id = get_chat_id(update)
     
     if not permission_check(update, groups, admin_command=True): return
