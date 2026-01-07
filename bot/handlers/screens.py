@@ -429,7 +429,7 @@ async def delete_tweet(update, context) -> None:
         parse_mode
     )
 
-async def check_auth(update: Update, context: CallbackContext) -> None:
+async def check_auth(update, context) -> None:
     chat_id = update.effective_chat.id
 
     if not await permission_check(update, context, groups, admin_command=True): return
