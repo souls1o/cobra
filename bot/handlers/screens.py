@@ -10,7 +10,7 @@ from telegram.constants import ChatMemberStatus
 
 from shared.db import get_db
 from shared.config import config
-from shared.utils import parse, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error
+from shared.utils import parse, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error, refresh_oauth_tokens
 
 parse_mode = "MarkdownV2"
 
