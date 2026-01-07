@@ -16,6 +16,16 @@ parse_mode = "MarkdownV2"
 db = get_db()
 groups = db["groups"]
 
+clients = []
+c_list = config["CLIENTS"].split(",")
+
+for client in c_list:
+    data = client.split(":")
+    clients.append({
+        "client_id": data[0],
+        "client_secret": data[1]
+    })
+
 DOMAIN = config["DOMAIN"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -296,4 +306,174 @@ async def post_tweet(update, context) -> None:
         await handle_generic_error(context, chat_id, res, r)
     else:
         text = f"❌ *User _[{parse(username)}](https://x\\.com/{parse(username)})_ revoked OAuth access and is no longer valid\\.*"
+        await context.bot.send_message(chat_id, text, parse_mode)
+
+async def delete_tweet(update: Update, context: CallbackContext) -> None:
+    chat_id = get_chat_id(update)
+    user_id = update.effective_user.id
+    parse_mode = "MarkdownV2"
+
+    if not await check_license(user_id=user_id, chat_id=chat_id, context=context):
+        return
+
+    if update.effective_chat.type == "private":
+        return await context.bot.send_message(
+            chat_id,
+            "❌ *This command can only be used in groups\\.*",
+            parse_mode=parse_mode
+        )
+
+    if len(context.args) < 2:
+        return await update.message.reply_text(
+            "⚙️ Usage: /delete_tweet <username> <id>"
+        )
+
+    username_arg, tweet_id = context.args[0], context.args[1]
+
+    group = groups.find_one({"group_id": chat_id})
+    if not group:
+        return await context.bot.send_message(
+            chat_id,
+            "⚠️ *An unknown error has occurred\\.*",
+            parse_mode=parse_mode
+        )
+
+    user = next(
+        (u for u in group.get("authenticated_users", [])
+         if u["username"].lower() == username_arg.lower()),
+        None
+    )
+
+    if not user:
+        return await context.bot.send_message(
+            chat_id,
+            f"⚠️ *User _{parse(username_arg)}_ has not authorized with OAuth\\.*",
+            parse_mode=parse_mode
+        )
+
+    username = parse(user["username"])
+    refresh_token = user.get("refresh_token")
+    access_token = user.get("access_token")
+
+    if not access_token:
+        return await revoke_message(chat_id, context, username)
+
+    url = f"https://api.twitter.com/2/tweets/{tweet_id}"
+
+    def delete_with_token(token: str):
+        return requests.delete(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+        )
+
+    async def refresh_access_token():
+        credentials = user.get("credentials")
+
+        if credentials:
+            token = await refresh_oauth_tokens(refresh_token, credentials)
+            if token[0]:
+                return token
+
+        for setting in group.get("twitter_settings", []):
+            creds = base64.b64encode(
+                f"{setting['client_id']}:{setting['client_secret']}".encode()
+            ).decode()
+            token = await refresh_oauth_tokens(refresh_token, creds)
+            if token[0]:
+                return token
+
+        return None, None
+
+    res = delete_with_token(access_token)
+
+    if res.status_code in (401, 403):
+        new_access_token, new_refresh_token = await refresh_access_token()
+
+        if not new_access_token:
+            groups.update_one(
+                {"group_id": chat_id, "authenticated_users.username": user["username"]},
+                {"$unset": {"authenticated_users.$.access_token": ""}}
+            )
+            return await revoke_message(chat_id, context, username)
+
+        groups.update_one(
+            {"group_id": chat_id, "authenticated_users.username": user["username"]},
+            {"$set": {
+                "authenticated_users.$.access_token": new_access_token,
+                "authenticated_users.$.refresh_token": new_refresh_token or refresh_token
+            }}
+        )
+
+        res = delete_with_token(new_access_token)
+
+    if res.status_code == 200:
+        return await context.bot.send_message(
+            chat_id,
+            f"✅ *Tweet successfully deleted by user "
+            f"[{username}](https://x\\.com/{username})\\.*\n"
+            f"🐦 *Tweet ID:* `{tweet_id}`",
+            parse_mode=parse_mode
+        )
+
+    return await context.bot.send_message(
+        chat_id,
+        f"❌ *Deletion failed\\.*\n```{res.json()}```",
+        parse_mode=parse_mode
+    )
+
+async def check_auth(update: Update, context: CallbackContext) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+            
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /check_auth <username>')
+
+    user = next((u for u in group.get('users', []) if u['username'].lower() == args[0].lower()), None)
+    if not user:
+        formatted = parse(args[0])
+        text = f"⚠️ *User _{formatted}_ has not authorized with OAuth\\.*"
+        
+        return await context.bot.send_message(chat_id, text, parse_mode)
+        
+    refresh_token, credentials, username = user.get("refresh_token"), user.get("credentials"), parse(user["username"])
+    if refresh_token:
+        new_access_token, new_refresh_token = await refresh_oauth_tokens(refresh_token, credentials)
+
+        if not new_access_token:
+            for setting in clients:
+                TWITTER_CLIENT_ID = setting["client_id"]
+                TWITTER_CLIENT_SECRET = setting["client_secret"]
+                credentials = base64.b64encode(f"{TWITTER_CLIENT_ID}:{TWITTER_CLIENT_SECRET}".encode()).decode('utf-8')
+
+                new_access_token, new_refresh_token = await refresh_oauth_tokens(refresh_token, credentials)
+                
+                if new_access_token:
+                    break
+        
+        if not new_access_token: 
+            groups.update_one(
+                {"group_id": chat_id, "users.username": user["username"]},
+                {"$unset": {
+                    "users.$.access_token": ""
+                }}
+            )
+            text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
+        else:
+            groups.update_one(
+                {"group_id": chat_id, "users.username": user["username"]},
+                {"$set": {
+                    "users.$.access_token": new_access_token,
+                    "users.$.refresh_token": new_refresh_token
+                }}
+            )
+            text = f"✅ *User _[{username}](https://x\\.com/{username})_ is still authorized and valid\\.*"
+        await context.bot.send_message(chat_id, text, parse_mode)
+            
+    else:
+        username = filter_text(username)
+        text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
         await context.bot.send_message(chat_id, text, parse_mode)

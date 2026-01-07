@@ -5,11 +5,11 @@ from shared.config import config
 bot_logger = config["LOGGER"]["BOT"]
 server_logger = config["LOGGER"]["SERVER"]
 
-clients = []
-c_list = config["CLIENTS"].split(",")
-
 db = get_db()
 groups = db["groups"]
+
+clients = []
+c_list = config["CLIENTS"].split(",")
 
 for client in c_list:
     data = client.split(":")
