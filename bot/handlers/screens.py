@@ -438,7 +438,9 @@ async def check_auth(update, context) -> None:
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /check_auth <username>')
 
-    user = next((u for u in group.get('users', []) if u['username'].lower() == args[0].lower()), None)
+    group = groups.find_one({ "group.id": chat_id })
+
+    user = next((u for u in group["users"] if u['username'].lower() == args[0].lower()), None)
     if not user:
         formatted = parse(args[0])
         text = f"⚠️ *User _{formatted}_ has not authorized with OAuth\\.*"
