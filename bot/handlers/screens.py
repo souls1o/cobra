@@ -1,6 +1,7 @@
 
 import re
 import uuid
+import requests
 from bot.handlers import keyboards
 
 from telegram import Update
