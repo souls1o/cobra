@@ -81,7 +81,7 @@ async def permission_check(update, context, groups, owner_command=False, admin_c
     
     return True
 
-def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_community=False, user_id=0) -> tuple:
+def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_community=False, is_quote=False, user_id=0) -> tuple:
     url = 'https://api.x.com/2/tweets' if not is_retweet else f'https://api.x.com/2/users/{user_id}/retweets'
     if not is_retweet:
         group = groups.find_one({"group.id": chat_id})
