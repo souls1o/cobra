@@ -48,7 +48,7 @@ def send_message(chat_id: int, message: str) -> None:
     except Exception as e:
         server_logger.error(f"Failed to send message to chat {chat_id}: {e}")
 
-async def permission_check(update, context, groups, admin_command=False, setup_command=False):
+async def permission_check(update, context, groups, owner_command=False, admin_command=False, setup_command=False):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
@@ -67,8 +67,15 @@ async def permission_check(update, context, groups, admin_command=False, setup_c
 
     if admin_command:
         whitelist = group["whitelist"]
-        if user_id not in whitelist and user_id != group["owner_id"]:
+        whitelist.append(group["owner_id"])
+        if user_id not in whitelist:
             text = "❌ *You are not authorized to use admin commands in this group\\.*"
+            await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2") 
+            return False
+
+    if owner_command:
+        if user_id != group["owner_id"]:
+            text = "❌ *Only the group owner is allowed to use this command\\.*"
             await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2") 
             return False
     
@@ -117,7 +124,6 @@ async def handle_successful_tweet(context, chat_id: int, username: str, response
             
     await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
     
-    
 async def handle_generic_error(context, chat_id: int, res: requests.Response, response: dict) -> None:
     if res.status_code == 403 and 'detail' in response:
         parse_mode = "MarkdownV2"
@@ -139,7 +145,6 @@ async def handle_generic_error(context, chat_id: int, res: requests.Response, re
                f"🛑 *Details:* {response.get('detail', 'Unknown error')}"
 
     await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
-    
     
 async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
     group = groups.find_one({"group.id": chat_id})
@@ -189,8 +194,7 @@ async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refr
             await handle_successful_tweet(context, chat_id, user["username"], r, is_reply=is_reply, is_retweet=is_retweet, is_quote=is_quote, is_community=is_community)
     else:
         await handle_generic_error(context, chat_id, res, r)
-    
-    
+     
 async def refresh_oauth_tokens(refresh_token: str, credentials) -> tuple:
     url = 'https://api.twitter.com/2/oauth2/token'
     data = {

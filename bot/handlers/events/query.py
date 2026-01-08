@@ -6,18 +6,22 @@ async def query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query: CallbackQuery = update.callback_query
     data: str = query.data
 
-    if data.startswith("users"):
-        message_id = context.user_data["users_message_id"]
-        page = int(data.split(":")[1])
+    a = data.split(":")
+    action = a[0]
+    args = a[1:]
 
-        await screens.display_users(update, context, page, message_id)
-    elif data.startswith("whitelist"):
-        context.user_data["awaiting_whitelist_id"] = True
+    if action == "users":
+        await screens.display_users(update, context, args[0], context.user_data["users_message_id"])
+    elif action.startswith("whitelist"):
 
-        if data.endswith("add"):
-            screens.add_whitelist(update, context)
+        if action.endswith("add"):
+            if not args:
+                await screens.add_whitelist(update, context, query)
         else:
-            screens.remove_whitelist(update, context)
+            if not args:
+                await screens.remove_whitelist(update, context, query)
+            else:
+                await screens.whitelist_removal(update, context, args[0])
 
 def get_handler():
     return CallbackQueryHandler(query)

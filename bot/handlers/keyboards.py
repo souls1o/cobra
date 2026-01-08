@@ -43,3 +43,15 @@ def whitelist():
         [InlineKeyboardButton("➖ Remove from whitelist", callback_data="whitelist_remove")]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+def whitelist_pagination(whitelist):
+    keyboard = []
+
+    for i in range(0, len(whitelist), 2):
+        row = [
+            InlineKeyboardButton(str(w), callback_data=f"whitelist_remove:{w}")
+            for w in whitelist[i:i+2]
+        ]
+        keyboard.append(row)
+
+    return InlineKeyboardMarkup(keyboard)
