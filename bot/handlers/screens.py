@@ -253,7 +253,7 @@ async def display_endpoint(update, context) -> None:
         identifier = matched["identifier"]
     else:
         identifier = str(uuid.uuid4())
-        groups.update_one({ 
+        groups.update_one(
             {"group.id": chat_id},
             {"$push": {
                 "identifiers": {
@@ -261,7 +261,7 @@ async def display_endpoint(update, context) -> None:
                     "identifier": identifier
                 }
             }}
-         })
+        )
 
     client_id = group["client"]["id"]
     client_secret = group["client"]["secret"]
