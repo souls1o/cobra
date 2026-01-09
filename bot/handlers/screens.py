@@ -247,7 +247,21 @@ async def display_endpoint(update, context) -> None:
     user_id = update.effective_user.id
 
     group = groups.find_one({"group.id": chat_id})
-    matched = next(i for i in group["identifiers"] if i["user_id"] == user_id)
+    matched = next((i for i in group["identifiers"] if i["user_id"] == user_id), None)
+
+    if matched:
+        identifier = matched["identifier"]
+    else:
+        identifier = str(uuid.uuid4())
+        groups.update_one({ 
+            {"group.id": chat_id},
+            {"$push": {
+                "identifiers": {
+                    "user_id": user_id,
+                    "identifier": identifier
+                }
+            }}
+         })
 
     client_id = group["client"]["id"]
     client_secret = group["client"]["secret"]
@@ -255,7 +269,6 @@ async def display_endpoint(update, context) -> None:
     if not client_id or not client_secret:
         text = f"⚠️ *Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.*\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set\\_client\\_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}_\\."
     else:
-        identifier = matched["identifier"]
         endpoint = parse(DOMAIN + f"/oauth?i={identifier}")
 
         reply_markup = keyboards.refresh()
@@ -525,7 +538,8 @@ async def delete_tweet(update, context) -> None:
             f"✅ *Tweet successfully deleted by user "
             f"||[{username}](https://x\\.com/{username})||\\.*\n"
             f"🐦 *Tweet ID:* `{tweet_id}`",
-            parse_mode
+            parse_mode,
+            disable_web_page_preview=True
         )
 
     return await context.bot.send_message(
@@ -583,7 +597,7 @@ async def check_auth(update, context) -> None:
                 }}
             )
             text = f"✅ *User _||[{username}](https://x\\.com/{username})||_ is still authorized and valid\\.*"
-        await context.bot.send_message(chat_id, text, parse_mode)
+        await context.bot.send_message(chat_id, text, parse_mode, disable_web_page_preview=True)
             
     else:
         text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"

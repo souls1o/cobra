@@ -122,7 +122,7 @@ async def handle_successful_tweet(context, chat_id: int, username: str, response
     else:
         text = f"✅ *Tweet successfully retweeted by user _{username}_\\.*"
             
-    await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
+    await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2", disable_web_page_preview=True)
     
 async def handle_generic_error(context, chat_id: int, res: requests.Response, response: dict) -> None:
     if res.status_code == 403 and 'detail' in response:
