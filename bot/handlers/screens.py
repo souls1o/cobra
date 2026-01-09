@@ -291,7 +291,7 @@ async def display_users(update, context, page=1, message_id=None) -> None:
             access_token = user.get('access_token')
 
             user_text = (
-                f"> {'🟢' if access_token else '🔴'} *[{parse(username)}](https://x\\.com/{username})* \\| _{authorized_at}_\n"
+                f"> {'🟢' if access_token else '🔴'} *||[{parse(username)}](https://x\\.com/{username})||* \\| _{authorized_at}_\n"
             )
             user_texts.append(user_text)
             
@@ -409,7 +409,7 @@ async def post_tweet(update, context) -> None:
     if not await permission_check(update, context, groups, admin_command=True): return
 
     args = context.args
-    if len(args) < 2: return await update.message.reply_text('⚙️ Usage: /post_tweet <community_id|optional> <username> <message>')
+    if len(args) < 2: return await update.message.reply_text('⚙️ Usage: /post_tweet <username> <message>')
 
     community_id = int(args[0]) if type(args[0]) == int else 0
     is_community = True if type(args[0]) == int else False
@@ -523,7 +523,7 @@ async def delete_tweet(update, context) -> None:
         return await context.bot.send_message(
             chat_id,
             f"✅ *Tweet successfully deleted by user "
-            f"[{username}](https://x\\.com/{username})\\.*\n"
+            f"||[{username}](https://x\\.com/{username})||\\.*\n"
             f"🐦 *Tweet ID:* `{tweet_id}`",
             parse_mode
         )
@@ -582,7 +582,7 @@ async def check_auth(update, context) -> None:
                     "users.$.refresh_token": new_refresh_token
                 }}
             )
-            text = f"✅ *User _[{username}](https://x\\.com/{username})_ is still authorized and valid\\.*"
+            text = f"✅ *User _||[{username}](https://x\\.com/{username})||_ is still authorized and valid\\.*"
         await context.bot.send_message(chat_id, text, parse_mode)
             
     else:

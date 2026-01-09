@@ -109,7 +109,7 @@ async def handle_successful_tweet(context, chat_id: int, username: str, response
     tweet_id = response['data']['id'] if not is_retweet else 0
     username = parse(username)
     if not is_retweet:
-        text = f"✅ *{'Reply' if is_reply else 'Quote tweet' if is_quote else 'Tweet'} successfully posted by user _{username}_\\.*\n" \
+        text = f"✅ *{'Reply' if is_reply else 'Quote tweet' if is_quote else 'Tweet'} successfully posted by user _||{username}||_\\.*\n" \
             f"🐦 *Tweet ID:* `{tweet_id}`\n" \
             f"🔗 __*[View {'reply' if is_reply else 'tweet'}](https://x\\.com/{username}/status/{tweet_id})*__"
         
