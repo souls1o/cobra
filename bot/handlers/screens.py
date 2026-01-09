@@ -190,7 +190,7 @@ async def set_redirect(update, context) -> None:
     await context.bot.send_message(chat_id, text, parse_mode)
         
 async def set_spoof(update, context) -> None:
-    chat_id = get_chat_id(update)
+    chat_id = update.effective_chat.id
     
     if not await permission_check(update, context, groups, admin_command=True): return
     
