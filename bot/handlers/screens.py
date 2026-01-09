@@ -200,11 +200,9 @@ async def set_spoof(update, context) -> None:
     url = args[0]
     if validators.url(url):
         group = groups.find_one({"group.id": chat_id}, {"identifiers": 1})
-        identifiers = []
 
         for item in group["identifiers"]:
-            item["identifier"] = f"{DOMAIN}/oauth?i={uuid.uuid4()}"
-            identifiers.append(item["identifier"])
+            item["identifier"] = str(uuid.uuid4())
 
         groups.update_one(
             {"group.id": chat_id},
