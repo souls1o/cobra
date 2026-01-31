@@ -82,7 +82,6 @@ async def setup(update, context):
     owner_id = owner.id
     owner_fullname = parse(owner.full_name)
 
-
     group_data = {
         "identifier": secrets.token_urlsafe(16),
         "ids": { 
@@ -109,7 +108,7 @@ async def setup(update, context):
     groups.insert_one(group_data)
 
     header = f"✅ *Group successfully setup for OAuth\\.*"
-    body = f"╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {parse(chat_id)}\n┣  *Group Name:* {parse(chat_title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* [{owner_fullname}](tg://user?id={owner_id})"
+    body = f"╭  ℹ️ *GROUP INFO*\n┣  *Group ID:* {parse(chat_id)}\n┣  *Group Name:* {parse(update.effective_chat.title)}\n┣  *Owner ID*: {owner_id}\n╰  *Owner Name:* [{owner_fullname}](tg://user?id={owner_id})"
     footer = "💬 _Use the */help* command to get the list of available commands\\._"
 
     text = f"{header}\n\n{body}\n\n{footer}"
