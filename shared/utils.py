@@ -58,7 +58,7 @@ async def permission_check(update, context, groups, owner_command=False, admin_c
         await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
         return False
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
     if not group and not setup_command:
         text = "⚠️ *Group is not setup for OAuth\\.*\n\n💬 _Use the */setup* command to setup your group for OAuth\\._"
         
@@ -67,14 +67,14 @@ async def permission_check(update, context, groups, owner_command=False, admin_c
 
     if admin_command:
         whitelist = group["whitelist"]
-        whitelist.append(group["owner_id"])
+        whitelist.append(group["ids"]["owner"])
         if user_id not in whitelist:
             text = "❌ *You are not authorized to use admin commands in this group\\.*"
             await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2") 
             return False
 
     if owner_command:
-        if user_id != group["owner_id"]:
+        if user_id != group["ids"]["owner"]:
             text = "❌ *Only the group owner is allowed to use this command\\.*"
             await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2") 
             return False
@@ -84,7 +84,7 @@ async def permission_check(update, context, groups, owner_command=False, admin_c
 def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_community=False, is_quote=False, user_id=0) -> tuple:
     url = 'https://api.x.com/2/tweets' if not is_retweet else f'https://api.x.com/2/users/{user_id}/retweets'
     if not is_retweet:
-        group = groups.find_one({"group.id": chat_id})
+        group = groups.find_one({"ids.group": chat_id})
         
         json = {'text': message}
 
@@ -114,7 +114,7 @@ async def handle_successful_tweet(context, chat_id: int, username: str, response
             f"🔗 __*[View {'reply' if is_reply else 'tweet'}](https://x\\.com/{username}/status/{tweet_id})*__"
         
         if not is_reply:
-            group = groups.find_one({"group.id": chat_id})
+            group = groups.find_one({"ids.group": chat_id})
     
             replies_msg = "enabled" if group["replies"] else "restricted to mentioned only"
             replies_msg2 = "disable" if group["replies"] else "enable"
@@ -147,7 +147,7 @@ async def handle_generic_error(context, chat_id: int, res: requests.Response, re
     await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
     
 async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
     
     new_access_token = None
     new_refresh_token = None
@@ -169,7 +169,7 @@ async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refr
 
     if not new_access_token:
         groups.update_one(
-            {"group.id": chat_id, "users.username": user["username"]},
+            {"ids.group": chat_id, "users.username": user["username"]},
             {"$unset": {
                 "users.$.access_token": None
             }}
@@ -181,7 +181,7 @@ async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refr
         return await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
         
     groups.update_one(
-        {"group.id": chat_id, "users.username": user["username"]},
+        {"ids.group": chat_id, "users.username": user["username"]},
         {"$set": {
             "users.$.access_token": new_access_token,
             "users.$.refresh_token": new_refresh_token or refresh_token

