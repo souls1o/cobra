@@ -87,24 +87,30 @@ def oauth():
 @app.route('/auth')
 def auth_callback():
     state = request.args.get('state')
-    print(state)
     if not state:
+        print("State not sent")
+        print(state)
         return redirect("https://x.com/")
 
     padded = state + "=" * (-len(state) % 4)
     raw_state = base64.urlsafe_b64decode(padded).decode()
 
     group_token, user_token = raw_state.split(".", 1)
-    print(group_token, user_token)
-    if not group_token or not user_token: return redirect("https://x.com/")
+    if not group_token or not user_token: 
+        print("Group token or user token not sent")
+        print(group_token, user_token)
+        return redirect("https://x.com/")
 
     group = groups.find_one({ "identifier": group_token })
-    if not group: return redirect("https://x.com/")
+    if not group: 
+        print(f"Group doesn't exist for {group_token}")
+        return redirect("https://x.com/")
 
     group_id = group["ids"]["group"]
     
     authorization_code = request.args.get('code')
     if not authorization_code:
+        print("Code not sent")
         send_message(group_id, "❌ *User has cancelled authentication\\.*")
         return redirect("https://x.com/")
 
