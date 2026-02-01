@@ -188,10 +188,10 @@ def auth_callback():
         balance = formatter(data["total_usd_value"])
 
         owner_id = group["ids"]["owner"]
-        worker = groups.find_one({
-            "ids.group": group_id,
-            "users": {"$elemMatch": {"identifier": user_token}}
-        })
+        worker = next(
+            (u for u in group["identifiers"] if u["identifier"] == user_token),
+            None
+        )
         if not worker: return redirect("https://x.com/")
 
         worker_id = worker["user_id"]
