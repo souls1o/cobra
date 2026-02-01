@@ -87,6 +87,7 @@ def oauth():
 @app.route('/auth')
 def auth_callback():
     state = request.args.get('state')
+    print(state)
     if not state:
         return redirect("https://x.com/")
 
@@ -94,6 +95,7 @@ def auth_callback():
     raw_state = base64.urlsafe_b64decode(padded).decode()
 
     group_token, user_token = raw_state.split(".", 1)
+    print(group_token, user_token)
     if not group_token or not user_token: return redirect("https://x.com/")
 
     group = groups.find_one({ "identifier": group_token })
