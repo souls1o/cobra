@@ -278,13 +278,13 @@ async def display_endpoint(update, context) -> None:
         raw_state = f"{group_token}.{user_token}"
         state = base64.urlsafe_b64encode(raw_state.encode()).decode().rstrip("=")
 
-        endpoint = (f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
+        endpoint = parse(f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
                             f'&redirect_uri={callback_url}'
                             f'&scope=tweet.read+users.read+tweet.write+offline.access+tweet.moderate.write'
                             f'&state={state}&code_challenge=challenge&code_challenge_method=plain')
 
         reply_markup = keyboards.refresh()
-        text = f"🔗 *Your endpoint*: {endpoint}"
+        text = f"🔗 *Your endpoint*: `{endpoint}`"
 
     await context.bot.send_message(chat_id, text, parse_mode)
 
