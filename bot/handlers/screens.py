@@ -231,7 +231,7 @@ async def set_replies(update, context) -> None:
         }}
     )
 
-    replies_msg = "_mentioned\\-only_" if group['replies'] else "_enabled_"
+    replies_msg = "_mentioned\\-only_" if group["settings"]["replies"] else "_enabled_"
     if result.modified_count > 0:
         text = f"✅ *Successfully set replies on tweets from accounts to {replies_msg}\\.*"
     else:
