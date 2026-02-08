@@ -88,7 +88,7 @@ def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is
         
         json = {'text': message}
 
-        if not group["replies"] and not is_reply:
+        if not group["settings"]["replies"] and not is_reply:
             json["reply_settings"] = "mentionedUsers"
 
         if is_reply:
@@ -116,8 +116,8 @@ async def handle_successful_tweet(context, chat_id: int, username: str, response
         if not is_reply:
             group = groups.find_one({"ids.group": chat_id})
     
-            replies_msg = "enabled" if group["replies"] else "restricted to mentioned only"
-            replies_msg2 = "disable" if group["replies"] else "enable"
+            replies_msg = "enabled" if group["settings"]["replies"] else "restricted to mentioned only"
+            replies_msg2 = "disable" if group["settings"]["replies"] else "enable"
             text += f"\n\n💬 _Replies for this tweet are {replies_msg}\\. To {replies_msg2} replies for tweets, use the command */set\\_replies*\\._"
     else:
         text = f"✅ *Tweet successfully retweeted by user _{username}_\\.*"
