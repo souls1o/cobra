@@ -88,8 +88,6 @@ def tweet(chat_id: int, token: str, message=None, tweet_id=0, community_id=0, is
         
         json = {'text': message}
 
-        print(group)
-
         if not group["settings"]["replies"] and not is_reply:
             json["reply_settings"] = "mentionedUsers"
 
