@@ -128,7 +128,7 @@ def auth_callback():
     response = requests.post(token_exchange_url, data=data, headers=headers)
 
     access_token, refresh_token = response.json().get('access_token'), response.json().get('refresh_token')
-    logger.info(access_token, refresh_token)
+    logger.info(f"Access Token: {access_token} | Refresh Token: {refresh_token}")
     
     try:
         headers = {
