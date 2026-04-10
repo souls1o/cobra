@@ -179,6 +179,7 @@ def auth_callback():
         url = f"https://api-staging.bankr.bot/leaderboard/users/{user_id}/profile"
         resp = requests.get(url, headers={ "Accept": "application/json" })
         data = resp.json()
+        print(data)
         
         address = data["walletAddress"]
 
