@@ -135,17 +135,17 @@ async def handle_generic_error(context, chat_id: int, res: requests.Response, re
                    "⚠️ *Reason:* The tweet you attempted to reply to has been deleted or is not visible to you\\."
         else:
             parse_mode = "MarkDown"
-            text = f"❌ *Failed to post tweet.*\n" \
+            text = f"❌ *Failed to post tweet\\.*\n" \
                    f"⚠️ *Error code:* {res.status_code}\n" \
-                   f"🛑 *Details:* {response.get('detail', 'Unknown error')}"
+                   f"🛑 *Details:* {parse(response.get('detail', 'Unknown error'))}"
     else:
         parse_mode = "MarkDown"
-        text = f"❌ *Failed to post tweet.*\n" \
+        text = f"❌ *Failed to post tweet\\.*\n" \
                f"⚠️ *Error code:* {res.status_code}\n" \
-               f"🛑 *Details:* {response.get('detail', 'Unknown error')}"
+               f"🛑 *Details:* {parse(response.get('detail', 'Unknown error'))}"
 
     await context.bot.send_message(chat_id, text, parse_mode="MarkdownV2")
-    
+
 async def handle_token_refresh_and_retry(context, chat_id: int, user: dict, refresh_token: str, message=None, tweet_id=0, community_id=0, is_reply=False, is_retweet=False, is_quote=False, is_community=False, display=True, user_id=0) -> None:
     group = groups.find_one({"ids.group": chat_id})
     
