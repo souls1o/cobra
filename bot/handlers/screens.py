@@ -29,6 +29,7 @@ for client in c_list:
     })
 
 DOMAIN = config["DOMAIN"]
+BEARER_TOKEN = config["BEARER_TOKEN"]
 
 async def start(update, context):
     chat_id = update.effective_chat.id
@@ -57,6 +58,7 @@ async def help(update, context) -> None:
             # "*•* 💬 */post\\_quote\\_tweet* \\<username\\> \\<tweet\\_url\\> \\<message\\> \\- Quotes a tweet on behalf of the user\\.\n "
             # "*•* 💬 */post\\_reply* \\<username\\> \\<tweet\\_id\\> \\<message\\> \\- Posts a reply to a tweet on behalf of the user\\.\n "
             "*•* ❌ */delete\\_tweet* \\<username\\> \\<tweet\\_id\\> \\- Deletes a tweet on behalf of the user\\.\n "
+            "*•* 💸 */check\\_balance* \\<username\\> \\- Checks the user's bankr balance\\.\n "
             "*•* 🐍 */check\\_auth* \\<username\\> \\- Checks if a user is still authorized\\.\n "
             "*•* 🔗 */display\\_endpoint* \\- Displays your personal endpoint\\.\n "
             "*•* 👥 */display\\_users* \\- Displays the list of authenticated users\\.\n "
@@ -427,6 +429,55 @@ async def whitelist_removal(update, context, user_id):
         text = f"❌ *Failed to remove the user _[{user_id}](tg://user?id={user_id})_ from the whitelist due to an unknown error\\.*"
 
     await context.bot.send_message(chat_id, text, parse_mode)
+
+async def check_balance(update, context) -> None:
+    chat_id = update.effective_chat.id
+
+    if not await permission_check(update, context, groups, admin_command=True): return
+
+    args = context.args
+    if len(args) < 1: return await update.message.reply_text('⚙️ Usage: /check_balance <username>')
+
+    uname = args[0]
+
+    url = f"https://api.twitter.com/2/users/by/username/{uname}"
+    headers = {
+        "Authorization": f"Bearer {BEARER_TOKEN}"
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        await context.bot.send_message(chat_id, f"❌ *Error occurred while fetching user information for user*: {parse(response.text)}")
+        raise Exception(f"Error: {response.status_code}, {response.text}")
+
+    data = response.json()
+    name = data["data"]["name"]
+    user_id = data["data"]["id"]
+    username = data["data"]["username"]
+
+    url = f"https://api-staging.bankr.bot/leaderboard/users/{user_id}/profile"
+    resp = requests.get(url, headers={ "Accept": "application/json" })
+    data = resp.json()
+
+    username_line = f"👤 *{name}* \\(@{parse(username)}\\)\n\n"
+    
+    address = data.get("walletAddress")
+    if address:
+        headers = {"AccessKey": config["DEBANK_API_KEY"]}
+        params = {"id": address}
+
+        resp = requests.get("https://pro-openapi.debank.com/v1/user/total_balance", params=params, headers=headers)
+        data = resp.json()
+
+        balance = formatter(data["total_usd_value"])
+
+        text = f"{username_line}💸 *Balance*: $*_{parse(balance)}_*\n🔗 *[{address}](https://debank.com/profile/{address})*"
+    else:
+        text = f"{username_line}🙁 _No wallet information assosiated with this user_"
+
+    await context.bot.send_message(chat_id, text, parse_mode)
+
 
 async def post_tweet(update, context) -> None:
     chat_id = update.effective_chat.id
