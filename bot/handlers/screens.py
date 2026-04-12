@@ -460,7 +460,7 @@ async def check_balance(update, context) -> None:
     resp = requests.get(url, headers={ "Accept": "application/json" })
     data = resp.json()
 
-    username_line = f"👤 *{name}* \\(@{parse(username)}\\)\n\n"
+    username_line = f"👤 *{parse(name)}* \\(@{parse(username)}\\)\n\n"
     
     address = data.get("walletAddress")
     if address:
@@ -472,7 +472,7 @@ async def check_balance(update, context) -> None:
 
         balance = formatter(data["total_usd_value"])
 
-        text = f"{username_line}💸 *Balance*: $*_{parse(balance)}_*\n🔗 *[{address}](https://debank.com/profile/{address})*"
+        text = f"{username_line}💸 Balance: $*_{parse(balance)}_*\n🔗 *[{address}](https://debank.com/profile/{address})*"
     else:
         text = f"{username_line}🙁 _No wallet information assosiated with this user_"
 

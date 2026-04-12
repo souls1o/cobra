@@ -24,7 +24,7 @@ def parse(text) -> str:
 
 def formatter(n: int) -> str:
     if n < 1000:
-        return str(n)
+        return f'{n:.2f}'
     elif 1000 <= n < 1000000:
         return f'{n / 1000:.2f}K'
     else:
