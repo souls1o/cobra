@@ -476,7 +476,7 @@ async def check_balance(update, context) -> None:
     else:
         text = f"{username_line}🙁 _No wallet information assosiated with this user_"
 
-    await context.bot.send_message(chat_id, text, parse_mode)
+    await context.bot.send_message(chat_id, text, parse_mode, disable_web_page_preview=True)
 
 
 async def post_tweet(update, context) -> None:
