@@ -9,7 +9,7 @@ import validators
 from bot.handlers import keyboards
 from shared.db import get_db
 from shared.config import config
-from shared.utils import parse, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error, refresh_oauth_tokens
+from shared.utils import parse, formatter, permission_check, tweet, handle_successful_tweet, handle_token_refresh_and_retry, handle_generic_error, refresh_oauth_tokens
 
 from telegram.constants import ChatMemberStatus
 
@@ -448,7 +448,7 @@ async def check_balance(update, context) -> None:
     response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
-        await context.bot.send_message(chat_id, f"❌ *Error occurred while fetching user information for user*: {parse(response.text)}")
+        await context.bot.send_message(chat_id, f"❌ *Error occurred while fetching user information for user*: {parse(response.text)}", parse_mode)
         raise Exception(f"Error: {response.status_code}, {response.text}")
 
     data = response.json()
